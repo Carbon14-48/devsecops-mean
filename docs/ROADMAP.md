@@ -7,7 +7,7 @@ Chaque version a un objectif unique, des étapes, un critère de passage, et des
 
 ---
 
-## V0 — Chaîne minimale (1 module, 1 outil) ✅ *en cours de clôture*
+## V0 — Chaîne minimale (1 module, 1 outil) ✅ **TERMINÉ**
 
 **Objectif** : prouver que `scan → normalisation → score → décision` fonctionne sur le cas le plus simple.
 
@@ -19,7 +19,10 @@ Chaque version a un objectif unique, des étapes, un critère de passage, et des
 | 4 | Scoring minimal (pondération sévérité + seuil fixe) | ✅ `pipeline/score/` |
 | 5 | Porte de décision avec log explicatif | ✅ `decide` + `decision.log` |
 | 6 | Test : vulns injectées → bonne décision | ✅ `scripts/v0-local.sh` → BLOCK |
-| 7 | Jenkins : job pipeline + webhook GitHub (HMAC en V2) | ⏳ Phase C |
+| 7 | Jenkins : job pipeline + webhook GitHub (HMAC en V2) | ✅ `pipeline/Jenkinsfile` + job `devsecops-v0` + webhook smee |
+
+**Critère de passage V0 — VALIDÉ** : un push GitHub → Jenkins → les 3 vulns détectées →
+porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/DEMO-V0.md`.)
 
 > **Périmètre V0 = un seul outil : SemGrep.** VULN-003 (lodash CVE) est documentée et
 > vérifiée **manuellement** via npm audit, mais volontairement **hors pipeline** en V0
