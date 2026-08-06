@@ -9,7 +9,10 @@
 set -euo pipefail
 
 SMEE_URL="${SMEE_URL:-https://smee.io/Idi3niApFloU03v}"
-TARGET="${TARGET:-http://localhost:8080/github-webhook/}"
+# NOTE : double slash final volontaire — smee-client supprime un slash, et Jenkins
+# répond 302 si le path `/github-webhook` (sans slash) est POSTé, puis 405 au GET
+# de redirection. `//` garantit que smee POSTe sur `/github-webhook/` (200).
+TARGET="${TARGET:-http://localhost:8080/github-webhook//}"
 LOG="$HOME/jenkins/smee.log"
 PIDFILE="$HOME/jenkins/smee.pid"
 
