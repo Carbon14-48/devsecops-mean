@@ -34,6 +34,20 @@ Type **Pipeline from SCM** :
 Configuration réutilisable dans `infra/job-devsecops-v0.xml`
 (créer : `POST /createItem?name=devsecops-v0` avec ce XML en body `application/xml`).
 
+Paramètre de build `SCAN_ROOT` (défaut `app`) : cible du scan SemGrep.
+Avec `SCAN_ROOT=test/fixtures/clean-app`, la même chaîne produit un build **vert**
+(voir § 5.b) — c'est la preuve que la porte de décision discrimine.
+
+### 3.b Job « devsecops-v0-pass » (chemin PASS)
+
+Même Pipeline from SCM, même Jenkinsfile, mais `SCAN_ROOT` par défaut = `test/fixtures/clean-app`
+(module sain, aucune vulnérabilité injectée → score 0 < seuil → PASS).
+
+Configuration dans `infra/job-devsecops-v0-pass.xml`
+(créer : `POST /createItem?name=devsecops-v0-pass` avec ce XML en body `application/xml`).
+
+Les deux jobs ont le trigger webhook : **un seul push lance le rouge et le vert en parallèle**.
+
 ## 4. Webhook GitHub → Jenkins local (via smee.io)
 
 GitHub ne peut pas joindre `localhost`. On utilise **smee.io** (relais officiel recommandé
@@ -57,8 +71,12 @@ Vérifier les livraisons : Settings → Webhooks → Recent Deliveries.
 
 1. `git push origin main`
 2. GitHub → smee → Jenkins (`/github-webhook/`)
-3. Le build tourne : `Provision outils → 1. Scan SAST (SemGrep) → 2. Normalisation → 3. Scoring + porte`
-4. Build **rouge** avec `DÉCISION : BLOCK (score 18 / seuil 10)` + artefacts archivés.
+3. Les deux jobs démarrent en parallèle.
+4. **devsecops-v0** : build **rouge** avec `DÉCISION : BLOCK (score 18 / seuil 10)` + artefacts archivés.
+5. **devsecops-v0-pass** : build **vert** avec `DÉCISION : PASS (score 0 / seuil 10)` + artefacts archivés.
+
+> Vérifie la **discrimination** du moteur : même chaîne, deux cibles différentes →
+> vulnérable = bloqué, sain = autorisé.
 
 ## Pré-requis sur le host
 

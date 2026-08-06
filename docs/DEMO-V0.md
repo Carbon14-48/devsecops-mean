@@ -33,24 +33,30 @@ Dans le terminal : `git push origin main` (ou montrer un commit).
 « Ce push déclenche le webhook GitHub. »
 
 ### 1:25 — Jenkins s'enclenche (50 s)
-Switcher sur la page du job :
-- Nouveau build lancé « Started by GitHub push »
+Switcher sur la page des jobs (ou celle du job) :
+- **Deux builds** démarrent en parallèle (le même push déclenche les deux jobs) :
+  - `devsecops-v0` → scan `app` → **rouge**
+  - `devsecops-v0-pass` → scan `test/fixtures/clean-app` → **vert**
 - Stages qui défilent : `1. Scan SAST (SemGrep)` → `2. Normalisation` → `3. Scoring`
-- Le build passe **rouge**
-- Ouvrir la console : `DÉCISION : BLOCK (18 / 10)` + le log « Pourquoi BLOCK »
+- Job rouge : console `DÉCISION : BLOCK (18 / 10)` + le log « Pourquoi BLOCK »
+- Job vert : console `DÉCISION : PASS (0 / 10)` + le log « Pourquoi PASS »
 - Montrer les **artefacts** archivés : `semgrep.sarif`, `pivot.json`, `decision.json`, `decision.log`
 
 ### 2:15 — Conclusion (15 s)
-« La porte est bloquante : les findings pèsent `poids(sévérité) × poids(catégorie)`,
-le seuil est configurable (`pipeline/score/config/`). En V1 : 4 outils, base de runs
-en MongoDB et recalibrage du seuil. En V2 : dashboard Angular + rapport IA, avec un
-LLM jamais décisionnaire — le gate reste déterministe. »
+« La porte est bloquante mais **discriminante** : le module vulnérable est bloqué,
+le module sain passe — le moteur ne bloque pas tout systématiquement. Les findings
+pèsent `poids(sévérité) × poids(catégorie)`, le seuil est configurable
+(`pipeline/score/config/`). En V1 : 4 outils, base de runs en MongoDB et recalibrage
+du seuil. En V2 : dashboard Angular + rapport IA, avec un LLM jamais décisionnaire —
+le gate reste déterministe. »
 
 ## Points d'attention pour la vidéo
 
-- Si le build est déjà **vert** sur le commit courant, faire un commit bidon puis push
-  pour avoir un nouveau build rouge à l'écran.
+- Si les builds sont déjà passés sur le commit courant, faire un commit bidon puis push
+  pour avoir un nouveau build rouge + vert à l'écran.
 - Ne pas montrer le secret réel : la clé AWS de `config.js` est un **exemple fictif**
   (`AKIAIOSFODNN7EXAMPLE`), le mentionner à l'oral si on zoome dessus.
 - Le relais smee doit tourner ; sinon GitHub affiche les deliveries en échec et rien
   ne se déclenche.
+- Le fixture sain (`test/fixtures/clean-app`) est volontairement **sans** `node_modules`
+  ni vulnérabilité : c'est ce qui garantit le score 0 et le build vert.

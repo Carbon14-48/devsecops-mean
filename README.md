@@ -50,7 +50,11 @@ cd pipeline && python3 -m venv .venv && .venv/bin/pip install semgrep
 pipeline/scripts/v0-local.sh
 ```
 
-Attendu : **BLOCK** (score 18/10) + log expliquant pourquoi.
+Attendu : **7/7 OK** — app vulnérable → **BLOCK** (score 18/10), module sain
+(`test/fixtures/clean-app`) → **PASS** (score 0/10) : le moteur discrimine.
+
+En Jenkins, un seul push déclenche les deux jobs (webhook smee) :
+`devsecops-v0` (rouge/BLOCK) et `devsecops-v0-pass` (vert/PASS) — voir [docs/SETUP-JENKINS.md](docs/SETUP-JENKINS.md).
 
 ## Principe d'architecture
 
