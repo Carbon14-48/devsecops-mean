@@ -8,9 +8,7 @@ pipeline {
   agent any
 
   environment {
-    TOOLS_DIR = '$HOME/devsecops-tools'
-    SEMGREP   = '$HOME/devsecops-tools/semgrep-venv/bin/semgrep'
-    OUT       = 'pipeline/out'
+    OUT = 'pipeline/out'
   }
 
   options {
@@ -38,6 +36,7 @@ pipeline {
       steps {
         sh '''
           set -eu
+          SEMGREP="$HOME/devsecops-tools/semgrep-venv/bin/semgrep"
           cd pipeline
           mkdir -p "$OUT"
           "$SEMGREP" scan --config rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" ../app
