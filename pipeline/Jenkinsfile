@@ -3,6 +3,8 @@
 // (pipeline/normalize, pipeline/score) — Jenkins ne fait qu'orchestrer.
 //
 // Déclencheur : push GitHub (webhook basique, HMAC en V2).
+// Paramètre du job : SCAN_ROOT (défaut "app") — ex. "test/fixtures/clean-app"
+// pour prouver le chemin PASS sur un module sain.
 
 pipeline {
   agent any
@@ -38,7 +40,7 @@ pipeline {
           set -eu
           SEMGREP="$HOME/devsecops-tools/semgrep-venv/bin/semgrep"
           mkdir -p "$OUT"
-          "$SEMGREP" scan --config pipeline/rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" app
+          "$SEMGREP" scan --config pipeline/rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" "${SCAN_ROOT:-app}"
         '''
       }
     }

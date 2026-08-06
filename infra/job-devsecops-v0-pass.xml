@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <flow-definition plugin="workflow-job">
-  <description>DevSecOps V0 — SemGrep → pivot → scoring → porte de décision (déclenché par webhook GitHub)</description>
+  <description>DevSecOps V0 — chemin PASS : même chaîne, mais scannée sur le module sain test/fixtures/clean-app → build vert (le gate ne bloque pas tout)</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <hudson.model.ParametersDefinitionProperty>
       <parameterDefinitions>
         <hudson.model.StringParameterDefinition>
           <name>SCAN_ROOT</name>
-          <description>Cible du scan SemGrep (défaut : app). Mettre test/fixtures/clean-app pour prouver le chemin PASS.</description>
-          <defaultValue>app</defaultValue>
+          <description>Cible du scan SemGrep : module sain (0 vulnérabilité injectée) → score 0 &lt; seuil → PASS.</description>
+          <defaultValue>test/fixtures/clean-app</defaultValue>
           <trim>false</trim>
         </hudson.model.StringParameterDefinition>
       </parameterDefinitions>

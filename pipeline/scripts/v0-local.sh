@@ -46,6 +46,19 @@ step "Logs d'explication générés"
 ls -la "$OUT"/decision*.log | sed 's/^/   /'
 if grep -q "Pourquoi BLOCK" "$OUT/decision.log"; then ok "decision.log explique le BLOCK"; else fail "decision.log manquant/incomplet"; fi
 
+step "5. Module sain (fixture) → 0 finding → PASS naturel"
+"$SEMGREP" scan --config rules/semgrep.yml --sarif -o "$OUT/semgrep-clean.sarif" "$REPO_ROOT/test/fixtures/clean-app" > "$OUT/semgrep-clean.log" 2>&1
+node normalize/src/index.js --sarif "$OUT/semgrep-clean.sarif" --out "$OUT/pivot-clean.json" > /dev/null
+N2=$(node -e "const p=require('$OUT/pivot-clean.json'); console.log(p.findings.length)")
+if [ "$N2" -eq 0 ]; then ok "pivot fixture sain : 0 finding (attendu)"; else fail "pivot fixture sain : $N2 findings (attendu 0)"; fi
+
+step "6. Scoring fixture sain (seuil par défaut 10) → PASS"
+node score/src/index.js "$OUT/pivot-clean.json" --out "$OUT/decision-clean.json" > /dev/null
+D3=$(node -e "console.log(require('$OUT/decision-clean.json').decision)")
+S3=$(node -e "console.log(require('$OUT/decision-clean.json').totalScore)")
+if [ "$D3" = "PASS" ]; then ok "décision = PASS (module sain, score $S3 < seuil)"; else fail "décision = $D3 (attendu PASS)"; fi
+if grep -q "Pourquoi PASS" "$OUT/decision-clean.log"; then ok "decision-clean.log explique le PASS"; else fail "decision-clean.log manquant/incomplet"; fi
+
 echo
 echo "====================================="
 echo "  V0 local E2E : $PASSED OK / $FAILED FAIL"

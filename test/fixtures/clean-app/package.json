@@ -1,0 +1,14 @@
+{
+  "name": "devsecops-mean-fixture-clean",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fixture sain pour prouver le chemin PASS de la chaîne V0 (aucune vulnérabilité injectée)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "lodash": "^4.17.21"
+  }
+}
