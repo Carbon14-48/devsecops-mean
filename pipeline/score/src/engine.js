@@ -73,7 +73,7 @@ function decide(pivot, opts = {}) {
 function explain(result) {
   const lines = [];
   lines.push('='.repeat(64));
-  lines.push(`  DÉCISION : ${result.decision}  (score ${result.totalScore} / seuil ${result.blockThreshold})`);
+  lines.push(`  DÉCISION : ${result.decision}  (score cumulé non plafonné ${result.totalScore} / seuil ${result.blockThreshold})`);
   lines.push('='.repeat(64));
   lines.push('');
   if (result.rawFindings === 0) {

@@ -16,6 +16,26 @@ demande explicitement un « seuil fixe même arbitraire » pour démontrer la ch
 - Seuil de blocage : **10 points** → tout run cumulant ≥ 10 points est BLOCK.
 - Les 3 vulns V0 totalisent 18 points → BLOCK attendu.
 
+## Sémantique du score (cumul non plafonné)
+
+Le score est une **somme pondérée cumulée, sans plafond** : chaque finding ajoute
+`poids(sévérité) × poids(catégorie)`, tous les findings s'additionnent. Le
+`blockThreshold` est une **ligne de décision** (pass/fail), **pas un maximum**
+d'échelle. C'est pourquoi un run peut afficher `score 18 / seuil 10` — c'est voulu,
+pas un bug de normalisation.
+
+Ce choix a deux justifications :
+
+1. **Information de cumul** : deux findings HIGH (14 pts) pèsent plus qu'un seul (7).
+   Un score plafonné à l'échelle perdrait la notion d'accumulation.
+2. **Recalibrage V1** : avec l'historique des runs stocké en MongoDB, on pourra
+   observer la distribution des scores cumulés et positionner le seuil sur les
+   données (ex : percentile) — plus facile avec un score non plafonné.
+
+Alternatives écartées en V0 : plafonner à `max(sévérité)` (perte du cumul) ou
+normaliser en 0-100 (surcharge de logique inutile pour un seuil fixe arbitraire).
+À réévaluer en V1 après collecte d'historique.
+
 ## Conséquences
 
 - 2 findings HIGH (7×1) + 1 MEDIUM (4×1) = 18 ≥ 10 → le blocage est démontré.

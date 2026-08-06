@@ -30,7 +30,12 @@ devsecops-mean/
 |----|---------------|---------|-----------|
 | VULN-001 | Injection NoSQL (`$where`, `findOne`) | `app/server/src/routes/search.js`, `auth.js` | SemGrep |
 | VULN-002 | Secret AWS en dur | `app/server/src/config.js` | SemGrep (Gitleaks en V1) |
-| VULN-003 | `lodash@4.17.15` avec CVE | `app/server/package.json` | npm audit (Trivy en V1) |
+| VULN-003 | `lodash@4.17.15` avec CVE | `app/server/package.json` | vérifiée manuellement (npm audit), **détection automatisée en V1 (Trivy)** |
+
+> **Périmètre V0 = un seul outil : SemGrep** (consigne de la roadmap). VULN-003 est
+> documentée et sa CVE vérifiée manuellement via `npm audit` (hors pipeline) — elle
+> n'est **pas** branchée au scoring V0. Sa détection automatisée arrive en V1 avec
+> Trivy (SCA), au même titre que les secrets (Gitleaks).
 
 ## Reproduire le V0 localement
 

@@ -1,0 +1,82 @@
+// DevSecOps V0 — chaîne minimale orchestrée par Jenkins.
+// Les 4 dernières étapes réutilisent exactement les scripts testés en local
+// (pipeline/normalize, pipeline/score) — Jenkins ne fait qu'orchestrer.
+//
+// Déclencheur : push GitHub (webhook basique, HMAC en V2).
+
+pipeline {
+  agent any
+
+  environment {
+    TOOLS_DIR = '$HOME/devsecops-tools'
+    SEMGREP   = '$HOME/devsecops-tools/semgrep-venv/bin/semgrep'
+    OUT       = 'pipeline/out'
+  }
+
+  options {
+    timestamps()
+    timeout(time: 15, unit: 'MINUTES')
+    disableConcurrentBuilds()
+  }
+
+  stages {
+    stage('Provision outils') {
+      steps {
+        sh '''
+          set -eu
+          mkdir -p "$HOME/devsecops-tools"
+          if [ ! -x "$HOME/devsecops-tools/semgrep-venv/bin/semgrep" ]; then
+            echo "[provision] création du venv semgrep (une seule fois)"
+            python3 -m venv "$HOME/devsecops-tools/semgrep-venv"
+            "$HOME/devsecops-tools/semgrep-venv/bin/pip" install -q semgrep
+          fi
+          "$HOME/devsecops-tools/semgrep-venv/bin/semgrep" --version
+        '''
+      }
+    }
+
+    stage('1. Scan SAST (SemGrep)') {
+      steps {
+        sh '''
+          set -eu
+          cd pipeline
+          mkdir -p "$OUT"
+          "$SEMGREP" scan --config rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" ../app
+        '''
+      }
+    }
+
+    stage('2. Normalisation SARIF → pivot') {
+      steps {
+        sh '''
+          set -eu
+          cd pipeline
+          node normalize/src/index.js --sarif "$OUT/semgrep.sarif" --out "$OUT/pivot.json"
+        '''
+      }
+    }
+
+    stage('3. Scoring + porte de décision') {
+      steps {
+        sh '''
+          set -eu
+          cd pipeline
+          node score/src/index.js "$OUT/pivot.json" --fail-on BLOCK
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      echo '=== ARCHIVES DU RUN (SARIF, pivot, décision, log) ==='
+      archiveArtifacts artifacts: 'pipeline/out/semgrep.sarif, pipeline/out/pivot.json, pipeline/out/decision.json, pipeline/out/decision.log', allowEmptyArchive: true
+    }
+    success {
+      echo '=== PORTE DE DÉCISION : PASS — build vert ==='
+    }
+    failure {
+      echo '=== PORTE DE DÉCISION : BLOCK — build rouge ==='
+    }
+  }
+}

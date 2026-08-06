@@ -21,6 +21,11 @@ Chaque version a un objectif unique, des étapes, un critère de passage, et des
 | 6 | Test : vulns injectées → bonne décision | ✅ `scripts/v0-local.sh` → BLOCK |
 | 7 | Jenkins : job pipeline + webhook GitHub (HMAC en V2) | ⏳ Phase C |
 
+> **Périmètre V0 = un seul outil : SemGrep.** VULN-003 (lodash CVE) est documentée et
+> vérifiée **manuellement** via npm audit, mais volontairement **hors pipeline** en V0
+> (elle sera détectée par Trivy en V1). C'est un choix assumé pour respecter la
+> consigne « un seul outil » ; il est documenté dans [ADR-0001](ADR/ADR-0001-threshold-v0.md).
+
 **Critère de passage V0** : un push GitHub déclenche Jenkins → les 3 vulns détectées → porte BLOCK → log clair.
 
 **Questions de réflexion (à documenter en ADR)**

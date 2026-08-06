@@ -28,6 +28,7 @@ const pivot = JSON.parse(fs.readFileSync(pivotFile, 'utf8'));
 const weightsFile = arg('--weights');
 const thresholdsFile = arg('--thresholds');
 const out = arg('--out');
+const failOn = arg('--fail-on');
 
 const opts = {};
 if (weightsFile) opts.weights = JSON.parse(fs.readFileSync(weightsFile, 'utf8'));
@@ -45,3 +46,8 @@ fs.writeFileSync(logPath, explain(result));
 console.log(explain(result));
 console.log(`[score] décision structurée → ${outPath}`);
 console.log(`[score] log explicatif      → ${logPath}`);
+
+if (failOn && result.decision === failOn) {
+  console.error(`[score] porte de décision → ${result.decision} (${failOn} attendu), exit 1`);
+  process.exit(1);
+}
