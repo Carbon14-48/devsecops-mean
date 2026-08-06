@@ -1,0 +1,30 @@
+# Règles SemGrep custom de la chaîne V0.
+# Elles ciblent précisément les vulnérabilités injectées dans app/inject/.
+# (Les packs p/owasp-top-ten + p/javascript seront ajoutés dans le Jenkinsfile
+# pour la couverture générale, en plus de ces règles.)
+
+rules:
+  # VULN-001 (variante recherche) : entrée utilisateur interpolée dans $where
+  - id: nosql-injection-where
+    languages: [javascript]
+    severity: ERROR
+    message: "NoSQL injection (VULN-001): user input interpolated into a `$where` operator. Use an escaped regex or text search, never $where."
+    patterns:
+      - pattern: |
+          $OBJ.find({ $where: $EXPR })
+
+  # VULN-001 (variante login) : filtre de requête construit directement à partir du body
+  - id: nosql-injection-query-filter
+    languages: [javascript]
+    severity: WARNING
+    message: "NoSQL injection (VULN-001): findOne() filter built from an object literal - risk of operator injection ({ $ne: ... }). Validate inputs as strings first."
+    patterns:
+      - pattern: |
+          $COL.findOne({ $U, $P })
+
+  # VULN-002 : secret AWS en clair dans le code
+  - id: hardcoded-aws-credential
+    languages: [javascript]
+    severity: ERROR
+    message: "Hardcoded credential (VULN-002): AWS access key in source code. Move to environment variable / secret manager."
+    pattern-regex: 'AKIA[0-9A-Z]{16}'

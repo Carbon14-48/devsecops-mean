@@ -1,0 +1,16 @@
+{
+  "name": "devsecops-mean-app-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cible MEAN (vulnérable volontairement) pour la chaîne DevSecOps V0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mongoose": "^8.4.0",
+    "lodash": "4.17.15"
+  }
+}

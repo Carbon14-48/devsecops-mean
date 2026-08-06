@@ -1,0 +1,21 @@
+{
+  "severity": {
+    "critical": 10,
+    "high": 7,
+    "medium": 4,
+    "low": 1,
+    "info": 0.5
+  },
+  "category": {
+    "sast": 1.0,
+    "sca": 1.0,
+    "secrets": 2.0,
+    "container": 1.2,
+    "k8s": 1.0,
+    "dast": 1.5
+  },
+  "noise": {
+    "minConfidence": 0.5,
+    "ignoredRules": []
+  }
+}

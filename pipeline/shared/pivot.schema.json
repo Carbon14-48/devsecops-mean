@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Carbon14-48/devsecops-mean/pipeline/shared/pivot.schema.json",
+  "title": "Pipeline pivot format",
+  "description": "Format pivot : source de vérité unique, agnostique à l'outil de scan. Chaque outil (semgrep, trivy, gitleaks...) produit des findings normalisés dans ce format.",
+  "type": "object",
+  "required": ["schemaVersion", "run", "findings"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "run": {
+      "type": "object",
+      "required": ["id", "createdAt", "tool"],
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "tool": { "type": "string" },
+        "branch": { "type": "string" },
+        "commit": { "type": "string" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "tool", "category", "severity", "confidence", "ruleId", "message", "file", "line"],
+      "properties": {
+        "id": { "type": "string", "description": "Hash stable tool|ruleId|file|line, utilisé pour la dédup entre runs" },
+        "tool": { "type": "string", "description": "Outil source : semgrep | trivy | gitleaks | zap | kube-score ..." },
+        "category": { "enum": ["sast", "sca", "secrets", "container", "k8s", "dast"] },
+        "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "ruleId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "file": { "type": "string", "description": "Chemin relatif au root du repo" },
+        "line": { "type": "integer" },
+        "cwe": { "type": "array", "items": { "type": "string" } },
+        "owasp": { "type": "array", "items": { "type": "string" } },
+        "raw": { "type": "object", "description": "Finding original de l'outil, pour traçabilité/audit" }
+      }
+    }
+  }
+}

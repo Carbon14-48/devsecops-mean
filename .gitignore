@@ -1,0 +1,21 @@
+# DevSecOps — dépendances
+node_modules/
+npm-debug.log*
+
+# Environnements / secrets (même en local)
+.env
+.env.*
+.venv/
+*.pem
+**/credentials.yml
+
+# Sorties de scan & artefacts
+*.sarif
+pipeline/out/
+pipeline/score/decisions/
+infra/*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
