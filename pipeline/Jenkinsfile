@@ -37,9 +37,8 @@ pipeline {
         sh '''
           set -eu
           SEMGREP="$HOME/devsecops-tools/semgrep-venv/bin/semgrep"
-          cd pipeline
           mkdir -p "$OUT"
-          "$SEMGREP" scan --config rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" ../app
+          "$SEMGREP" scan --config pipeline/rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" app
         '''
       }
     }
@@ -48,8 +47,7 @@ pipeline {
       steps {
         sh '''
           set -eu
-          cd pipeline
-          node normalize/src/index.js --sarif "$OUT/semgrep.sarif" --out "$OUT/pivot.json"
+          node pipeline/normalize/src/index.js --sarif "$OUT/semgrep.sarif" --out "$OUT/pivot.json"
         '''
       }
     }
@@ -58,8 +56,7 @@ pipeline {
       steps {
         sh '''
           set -eu
-          cd pipeline
-          node score/src/index.js "$OUT/pivot.json" --fail-on BLOCK
+          node pipeline/score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json" --fail-on BLOCK
         '''
       }
     }
