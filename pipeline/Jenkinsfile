@@ -71,7 +71,7 @@ pipeline {
             sh '''
               set -eu
               mkdir -p "$OUT"
-              "$GITLEAKS" detect --config .gitleaks.toml --report-format json --report-path "$OUT/gitleaks.json" -v . > "$OUT/gitleaks.log" 2>&1 || true
+              "$GITLEAKS" detect --config .gitleaks.toml --no-git -s "${SCAN_ROOT:-.}" --report-format json --report-path "$OUT/gitleaks.json" -v > "$OUT/gitleaks.log" 2>&1 || true
             '''
           }
         }
