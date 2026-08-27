@@ -135,14 +135,18 @@ pipeline {
           node pipeline/normalize/src/index.js --json "$OUT/trivy.json" --tool trivy --out "$OUT/pivot-trivy.json"
           node pipeline/normalize/src/index.js --json "$OUT/gitleaks.json" --tool gitleaks --out "$OUT/pivot-gitleaks.json"
 
+          # Composition analysis
+          node pipeline/ai/composition.js "${SCAN_ROOT:-app}" "$OUT/pivot-composition.json"
+
+          # K8s audit
           KUBE_SCORE="$HOME/devsecops-tools/kube-score"
           if [ -x "$KUBE_SCORE" ]; then
             "$KUBE_SCORE" score k8s/base/*.yaml > "$OUT/kube-score.txt" 2>&1 || true
             node pipeline/normalize/src/index.js --text "$OUT/kube-score.txt" --tool kube-score --out "$OUT/pivot-kube-score.json"
-            node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" "$OUT/pivot-kube-score.json" --out "$OUT/pivot.json"
+            node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" "$OUT/pivot-kube-score.json" "$OUT/pivot-composition.json" --out "$OUT/pivot.json"
           else
             echo "[resilience] kube-score not found, skipping K8s audit"
-            node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" --out "$OUT/pivot.json"
+            node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" "$OUT/pivot-composition.json" --out "$OUT/pivot.json"
           fi
         '''
       }
