@@ -9,6 +9,7 @@ const { convertSemgrep } = require('./semgrep');
 const { convertTrivy } = require('./trivy');
 const { convertGitleaks } = require('./gitleaks');
 const { parseKubeScore } = require('./kube-score');
+const { parseZapJson } = require('./zap');
 const { mergePivots } = require('./merge');
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -68,10 +69,13 @@ if (tool === 'semgrep') {
 } else if (tool === 'gitleaks') {
   const input = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
   findings = convertGitleaks(input, { root });
-} else if (tool === 'kube-score') {
-  const text = fs.readFileSync(textFile, 'utf8');
-  findings = parseKubeScore(text);
-} else {
+  } else if (tool === 'kube-score') {
+    const text = fs.readFileSync(textFile, 'utf8');
+    findings = parseKubeScore(text);
+  } else if (tool === 'zaproxy') {
+    const input = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
+    findings = parseZapJson(input);
+  } else {
   console.error(`[normalize] tool inconnu: ${tool}`);
   process.exit(1);
 }
