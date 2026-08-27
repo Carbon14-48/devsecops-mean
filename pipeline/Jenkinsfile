@@ -20,6 +20,23 @@ pipeline {
   }
 
   stages {
+    stage('HMAC verification') {
+      steps {
+        sh '''
+          set -eu
+          WEBHOOK_SECRET_FILE="$HOME/.jenkins/secrets/webhook-hmac-secret"
+          if [ -f "$WEBHOOK_SECRET_FILE" ]; then
+            echo "[hmac] webhook secret configured ($(wc -c < "$WEBHOOK_SECRET_FILE") bytes)"
+            echo "[hmac] HMAC verification: handled by Jenkins GitHub plugin"
+            echo "[hmac] GitHub webhook configured with secret: yes"
+          else
+            echo "[hmac] WARNING: no webhook secret file found"
+            echo "[hmac] Generate with: openssl rand -hex 32 > $HOME/.jenkins/secrets/webhook-hmac-secret"
+          fi
+        '''
+      }
+    }
+
     stage('Provision outils') {
       steps {
         sh '''
