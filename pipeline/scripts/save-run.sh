@@ -3,7 +3,7 @@
 set -eu
 
 OUT_DIR="${1:-pipeline/out}"
-RUNS_DIR="pipeline/runs"
+RUNS_DIR="${DEVSECOPS_RUNS_DIR:-$HOME/devsecops-runs}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RUN_DIR="$RUNS_DIR/$TIMESTAMP"
 

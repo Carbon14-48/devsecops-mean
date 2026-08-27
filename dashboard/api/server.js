@@ -8,7 +8,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3200;
 const PIPELINE_OUT = path.resolve(__dirname, '../../pipeline/out');
-const RUNS_DIR = path.resolve(__dirname, '../../pipeline/runs');
+const RUNS_DIR = process.env.DEVSECOPS_RUNS_DIR || path.join(require('os').homedir(), 'devsecops-runs');
 
 app.use(cors());
 app.use(express.json());
