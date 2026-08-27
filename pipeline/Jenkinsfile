@@ -141,7 +141,11 @@ pipeline {
       '''
       script {
         def decision = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).decision)\"", returnStdout: true).trim()
-        echo "Decision from decision.json: $decision"
+        def score = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).totalScore)\"", returnStdout: true).trim()
+        def threshold = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).blockThreshold)\"", returnStdout: true).trim()
+        def findings = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).filteredFindings)\"", returnStdout: true).trim()
+        echo "Decision: ${decision} | Score: ${score} | Findings: ${findings}"
+        sh "bash pipeline/scripts/notify.sh '${decision}' '${score}' '${threshold}' '${findings}' '$OUT/report.txt'"
         if (decision == 'BLOCK') {
           error("BLOCK: score depasse le seuil")
         }
