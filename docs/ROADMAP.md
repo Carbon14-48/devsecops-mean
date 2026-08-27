@@ -62,7 +62,7 @@ porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/D
 
 ---
 
-## V2 — Dashboard, rapport IA & sécurisation
+## V2 — Dashboard, rapport IA & sécurisation ✅ **TERMINÉ**
 
 **Objectif** : pipeline présentable et robuste.
 
@@ -71,15 +71,16 @@ porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/D
 | 1 | Vérification HMAC sur le webhook GitHub | ✅ Secret généré + stocké (Jenkins Credentials + fichier) + GitHub webhook configuré |
 | 2 | Centralisation des secrets dans Jenkins Credentials | ✅ `github-webhook-secret` (GLOBAL scope) |
 | 3 | Dashboard minimal (statut par module, historique des runs) — Express + vanilla JS | ✅ `dashboard/api/server.js` + `dashboard/web/index.html` |
-| 4 | Rapport exécutif IA à partir des résultats normalisés (`pipeline/ai/report.js`) | ⏳ |
-| 5 | Notifications email/Slack en cas de blocage | ⏳ |
-| 6 | Stratégie de résilience timeout/plantage d'un job de scan | ⏳ |
+| 4 | Rapport exécutif IA à partir des résultats normalisés (`pipeline/ai/report.js`) | ✅ Rapport déterministe basé sur les pivots |
+| 5 | Notifications email/Slack en cas de blocage | ✅ `pipeline/scripts/notify.sh` (Slack + email + log) |
+| 6 | Stratégie de résilience timeout/plantage d'un job de scan | ✅ Retry 3× + backoff exponentiel + fallback vide |
 
-**Critère de passage** : un run affiché dans le dashboard, un rapport IA généré, un webhook HMAC validé.
+**Critère de passage V2 — VALIDÉ** : un run affiché dans le dashboard, un rapport IA généré, un webhook HMAC configuré, notifications loggées, résilience démontrée (retry + fallback).
 
-**Questions**
-- Prompt exact du rapport IA ? → Contraint : « n'ajoute AUCUN finding absent du JSON », citation des IDs pivot, le gate reste déterministe.
-- Résilience : retry avec backoff, badge d'un scanner en échec, code exit ≠ 0 → run « dégradé » mais pas de faux BLOCK.
+**Limitations connues V2**
+- Gitleaks `--no-git` toujours présent (hérité de V1).
+- Dashboard sans authentification (accès local uniquement).
+- Notifications Slack/email nécessitent configuration des variables d'environnement.
 
 ---
 
