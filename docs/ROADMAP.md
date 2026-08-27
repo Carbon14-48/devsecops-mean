@@ -68,8 +68,8 @@ porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/D
 
 | # | Étape | Statut |
 |---|-------|--------|
-| 1 | Vérification HMAC sur le webhook GitHub | ⏳ |
-| 2 | Centralisation des secrets dans Jenkins Credentials | ⏳ |
+| 1 | Vérification HMAC sur le webhook GitHub | ✅ Secret généré + stocké (Jenkins Credentials + fichier) + GitHub webhook configuré |
+| 2 | Centralisation des secrets dans Jenkins Credentials | ✅ `github-webhook-secret` (GLOBAL scope) |
 | 3 | Dashboard minimal (statut par module, historique des runs) — Angular + Express sur MongoDB | ⏳ |
 | 4 | Rapport exécutif IA à partir des résultats normalisés (`pipeline/ai/report.js`) | ⏳ |
 | 5 | Notifications email/Slack en cas de blocage | ⏳ |
