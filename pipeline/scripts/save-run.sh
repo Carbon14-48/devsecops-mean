@@ -9,7 +9,7 @@ RUN_DIR="$RUNS_DIR/$TIMESTAMP"
 
 mkdir -p "$RUN_DIR"
 
-for f in decision.json decision.log pivot.json pivot-*.json semgrep.sarif trivy.json gitleaks.json gitleaks.log; do
+for f in decision.json decision.log pivot.json pivot-*.json semgrep.sarif trivy.json gitleaks.json gitleaks.log report.txt; do
   if [ -f "$OUT_DIR/$f" ]; then
     cp "$OUT_DIR/$f" "$RUN_DIR/"
   fi

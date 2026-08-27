@@ -115,12 +115,21 @@ pipeline {
         '''
       }
     }
+
+    stage('6. Rapport exécutif') {
+      steps {
+        sh '''
+          set +e
+          node pipeline/ai/report.js "$OUT/pivot.json" "$OUT/decision.json" "$OUT/report.txt"
+        '''
+      }
+    }
   }
 
   post {
     always {
       echo '=== ARCHIVES DU RUN (pivots, décision, log) ==='
-      archiveArtifacts artifacts: 'pipeline/out/*.sarif, pipeline/out/*.json, pipeline/out/*.log', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'pipeline/out/*.sarif, pipeline/out/*.json, pipeline/out/*.log, pipeline/out/*.txt', allowEmptyArchive: true
       sh '''
         set +e
         bash pipeline/scripts/save-run.sh "$OUT" 2>/dev/null
