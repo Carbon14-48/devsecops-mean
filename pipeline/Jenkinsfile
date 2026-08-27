@@ -121,6 +121,10 @@ pipeline {
     always {
       echo '=== ARCHIVES DU RUN (pivots, décision, log) ==='
       archiveArtifacts artifacts: 'pipeline/out/*.sarif, pipeline/out/*.json, pipeline/out/*.log', allowEmptyArchive: true
+      sh '''
+        set +e
+        bash pipeline/scripts/save-run.sh "$OUT" 2>/dev/null
+      '''
     }
     success {
       echo '=== PORTE DE DÉCISION : PASS — build vert ==='

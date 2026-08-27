@@ -19,3 +19,4 @@ infra/*.log
 .vscode/
 .idea/
 .DS_Store
+pipeline/runs/

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevSecOps Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e1e4e8; min-height: 100vh; }
+    .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .status { font-size: 13px; color: #8b949e; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+    .card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .card .value { font-size: 28px; font-weight: 700; }
+    .card .value.block { color: #f85149; }
+    .card .value.pass { color: #3fb950; }
+    .card .value.warn { color: #d29922; }
+    .section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 24px; }
+    .section-header { padding: 16px 20px; border-bottom: 1px solid #30363d; font-weight: 600; font-size: 15px; }
+    .section-body { padding: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 16px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #30363d; background: #0d1117; }
+    td { padding: 10px 16px; border-bottom: 1px solid #21262d; font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #1c2128; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge.block { background: #f8514922; color: #f85149; }
+    .badge.pass { background: #3fb95022; color: #3fb950; }
+    .badge.unknown { background: #8b949e22; color: #8b949e; }
+    .sev-critical { color: #f85149; font-weight: 600; }
+    .sev-high { color: #d29922; font-weight: 600; }
+    .sev-medium { color: #58a6ff; }
+    .sev-low { color: #8b949e; }
+    .bar-container { display: flex; align-items: center; gap: 8px; }
+    .bar { height: 8px; border-radius: 4px; background: #30363d; flex: 1; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .bar-fill.block { background: #f85149; }
+    .bar-fill.pass { background: #3fb950; }
+    .empty { padding: 40px; text-align: center; color: #8b949e; }
+    .log { padding: 16px 20px; font-family: 'Fira Code', monospace; font-size: 13px; white-space: pre-wrap; color: #c9d1d9; max-height: 400px; overflow-y: auto; }
+    .refresh { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .refresh:hover { background: #30363d; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>DevSecOps Dashboard</h1>
+    <div>
+      <span class="status" id="lastUpdate"></span>
+      <button class="refresh" onclick="loadAll()">Rafraîchir</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="cards" id="cards">
+      <div class="card"><div class="label">Décision</div><div class="value" id="decision">—</div></div>
+      <div class="card"><div class="label">Score</div><div class="value" id="score">—</div></div>
+      <div class="card"><div class="label">Findings</div><div class="value" id="findings">—</div></div>
+      <div class="card"><div class="label">Seuil</div><div class="value" id="threshold">—</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">Top Findings</div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>Score</th><th>Sévérité</th><th>Catégorie</th><th>Outil</th><th>Fichier</th><th>Règle</th></tr></thead>
+          <tbody id="findingsTable"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">Historique des runs</div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>Run</th><th>Décision</th><th>Score</th><th>Findings</th><th>Barre</th></tr></thead>
+          <tbody id="runsTable"><tr><td colspan="5" class="empty">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">Log de décision (dernier run)</div>
+      <div class="section-body">
+        <div class="log" id="decisionLog">Chargement...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.hostname === 'localhost' && window.location.port !== '3200'
+      ? 'http://localhost:3200'
+      : '';
+
+    async function fetchJSON(url) {
+      const res = await fetch(API + url);
+      return res.json();
+    }
+
+    function badgeClass(d) {
+      if (d === 'BLOCK') return 'block';
+      if (d === 'PASS') return 'pass';
+      return 'unknown';
+    }
+
+    function sevClass(s) {
+      return 'sev-' + s;
+    }
+
+    async function loadAll() {
+      document.getElementById('lastUpdate').textContent = 'Mise à jour...';
+
+      const status = await fetchJSON('/api/status');
+      if (status.latest) {
+        const d = status.latest;
+        const decEl = document.getElementById('decision');
+        decEl.textContent = d.decision;
+        decEl.className = 'value ' + badgeClass(d.decision);
+
+        const scoreEl = document.getElementById('score');
+        scoreEl.textContent = d.totalScore + ' / ' + d.blockThreshold;
+        scoreEl.className = 'value ' + (d.decision === 'BLOCK' ? 'block' : 'pass');
+
+        document.getElementById('findings').textContent = d.filteredFindings + ' / ' + d.rawFindings;
+        document.getElementById('threshold').textContent = d.blockThreshold;
+      }
+
+      if (status.latest && status.latest.top) {
+        const tbody = document.getElementById('findingsTable');
+        if (status.latest.top.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun finding</td></tr>';
+        } else {
+          tbody.innerHTML = status.latest.top.map(f => `
+            <tr>
+              <td><strong>${f.score.toFixed(1)}</strong></td>
+              <td class="${sevClass(f.severity)}">${f.severity}</td>
+              <td>${f.category}</td>
+              <td>${f.tool}</td>
+              <td title="${f.file}:${f.line}">${f.file.split('/').pop()}:${f.line}</td>
+              <td>${f.ruleId}</td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      const runs = await fetchJSON('/api/runs');
+      const runsBody = document.getElementById('runsTable');
+      if (runs.length === 0) {
+        runsBody.innerHTML = '<tr><td colspan="5" class="empty">Aucun run historique</td></tr>';
+      } else {
+        const maxScore = Math.max(...runs.map(r => r.score), 1);
+        runsBody.innerHTML = runs.slice(0, 20).map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td><span class="badge ${badgeClass(r.decision)}">${r.decision}</span></td>
+            <td>${r.score}</td>
+            <td>${r.findings}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar"><div class="bar-fill ${badgeClass(r.decision)}" style="width:${Math.min(100, (r.score / maxScore) * 100)}%"></div></div>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      if (status.latest) {
+        const logRes = await fetchJSON('/api/runs/' + (runs[0] ? runs[0].id : ''));
+        if (logRes.log) {
+          document.getElementById('decisionLog').textContent = logRes.log;
+        } else {
+          document.getElementById('decisionLog').textContent = 'Aucun log disponible';
+        }
+      }
+
+      document.getElementById('lastUpdate').textContent = 'Mis à jour: ' + new Date().toLocaleTimeString();
+    }
+
+    loadAll();
+    setInterval(loadAll, 30000);
+  </script>
+</body>
+</html>
