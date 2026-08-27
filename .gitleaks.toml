@@ -1,5 +1,18 @@
 title = "DevSecOps MEAN — Gitleaks config"
 
+[allowlist]
+description = "Global allowlist — exclusions de chemins"
+paths = [
+  '''pipeline/out/''',
+  '''pipeline/.venv/''',
+  '''app/server/node_modules/''',
+  '''\.sarif$''',
+  '''\.log$''',
+  '''pivot-.*\.json$''',
+  '''decision.*\.json$''',
+  '''gitleaks\.json$''',
+]
+
 [[rules]]
 id = "aws-access-key"
 description = "AWS access key"

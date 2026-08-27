@@ -45,13 +45,15 @@ node normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.
 NM=$(node -e "const p=require('$OUT/pivot.json'); console.log(p.findings.length)")
 if [ "$NM" -eq $((N1 + N2 + N3)) ]; then ok "Merge: $NM findings (somme des 3 outils)"; else fail "Merge: $NM findings (attendu $((N1 + N2 + N3)))"; fi
 
-step "5. Scoring agrégé (seuil 10)"
+step "5. Scoring agrégé (seuil 10) — avant/après filtrage bruit"
 set +e
 node score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json" --fail-on BLOCK > /dev/null 2>&1
 set -e
 D=$(node -e "console.log(require('$OUT/decision.json').decision)")
 S=$(node -e "console.log(require('$OUT/decision.json').totalScore)")
-if [ "$D" = "BLOCK" ]; then ok "décision = BLOCK (score $S ≥ seuil 10)"; else fail "décision = $D (attendu BLOCK)"; fi
+RF=$(node -e "console.log(require('$OUT/decision.json').rawFindings)")
+FF=$(node -e "console.log(require('$OUT/decision.json').filteredFindings)")
+if [ "$D" = "BLOCK" ]; then ok "décision = BLOCK (score $S ≥ seuil 10) | bruts: $RF → filtrés: $FF"; else fail "décision = $D (attendu BLOCK)"; fi
 
 step "6. Scan d'image Docker"
 if docker image inspect mean-app:local > /dev/null 2>&1; then
@@ -80,6 +82,21 @@ if [ "$DG" = "BLOCK" ]; then ok "Gitleaks seul → BLOCK"; else fail "Gitleaks s
 
 step "Logs"
 ls -la "$OUT"/decision*.log | sed 's/^/   /'
+
+step "8. Test PASS (fixture sain — 4 outils, seuil 10)"
+"$SEMGREP" scan --config rules/semgrep.yml --sarif -o "$OUT/semgrep-pass.sarif" "$REPO_ROOT/test/fixtures/clean-app" > /dev/null 2>&1
+node normalize/src/index.js --sarif "$OUT/semgrep-pass.sarif" --tool semgrep --out "$OUT/pivot-semgrep-pass.json" > /dev/null
+trivy fs --format json --severity HIGH,CRITICAL "$REPO_ROOT/test/fixtures/clean-app" > "$OUT/trivy-pass.json" 2>/dev/null
+node normalize/src/index.js --json "$OUT/trivy-pass.json" --tool trivy --out "$OUT/pivot-trivy-pass.json" > /dev/null
+"$GITLEAKS" detect --config "$REPO_ROOT/.gitleaks.toml" --no-git -s "$REPO_ROOT/test/fixtures/clean-app" --report-format json --report-path "$OUT/gitleaks-pass.json" 2>/dev/null
+node normalize/src/index.js --json "$OUT/gitleaks-pass.json" --tool gitleaks --out "$OUT/pivot-gitleaks-pass.json" > /dev/null
+node normalize/src/index.js --merge "$OUT/pivot-semgrep-pass.json" "$OUT/pivot-trivy-pass.json" "$OUT/pivot-gitleaks-pass.json" --out "$OUT/pivot-pass.json" > /dev/null
+set +e
+node score/src/index.js "$OUT/pivot-pass.json" --out "$OUT/decision-pass.json" --fail-on BLOCK > /dev/null 2>&1
+set -e
+DP=$(node -e "console.log(require('$OUT/decision-pass.json').decision)")
+SP=$(node -e "console.log(require('$OUT/decision-pass.json').totalScore)")
+if [ "$DP" = "PASS" ]; then ok "PASS path: $DP (score $SP < seuil 10)"; else fail "PASS path: $DP (attendu PASS)"; fi
 
 echo
 echo "======================================="
