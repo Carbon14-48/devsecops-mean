@@ -225,11 +225,11 @@ k8s/
 ## Ce qui reste à faire
 
 ### Immédiat
-- [ ] **Installer un cluster K8s** (k3d ou minikube) pour tester les manifests
-- [ ] **Installer Argo CD** dans le cluster
-- [ ] **Déployer l'app** via Argo CD et vérifier le sync
-- [ ] **Exécuter ZAP DAST** contre l'app déployée
 - [ ] **Configurer les notifications** (Slack webhook, email)
+- [x] ~~**Installer un cluster K8s** (k3d)~~ ✅ k3d cluster `devsecops` running
+- [ ] **Installer Argo CD** — bloqué : Docker Hub injoignable depuis cette machine
+- [ ] **Déployer l'app** via Argo CD quand réseau disponible
+- [ ] **Exécuter ZAP DAST** contre l'app déployée
 
 ### Optionnel
 - [ ] Angular dashboard (remplacer vanilla JS)
