@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const { convertSemgrep } = require('./semgrep');
 const { convertTrivy } = require('./trivy');
 const { convertGitleaks } = require('./gitleaks');
+const { parseKubeScore } = require('./kube-score');
 const { mergePivots } = require('./merge');
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -17,6 +18,7 @@ function usage() {
   console.error('  node normalize/src/index.js --sarif <file> [--tool semgrep] [--out pivot.json] [--root dir]');
   console.error('  node normalize/src/index.js --json <file> --tool trivy   [--out pivot.json] [--root dir]');
   console.error('  node normalize/src/index.js --json <file> --tool gitleaks [--out pivot.json] [--root dir]');
+  console.error('  node normalize/src/index.js --text <file> --tool kube-score [--out pivot.json]');
   console.error('  node normalize/src/index.js --merge <p1.json> <p2.json> ... [--out pivot.json]');
   process.exit(2);
 }
@@ -50,9 +52,10 @@ if (argv.includes('--merge')) {
 // Single-tool mode
 const sarifFile = arg('--sarif');
 const jsonFile = arg('--json');
+const textFile = arg('--text');
 const tool = arg('--tool', sarifFile ? 'semgrep' : 'semgrep');
 
-if (!sarifFile && !jsonFile) usage();
+if (!sarifFile && !jsonFile && !textFile) usage();
 
 let findings;
 
@@ -65,6 +68,9 @@ if (tool === 'semgrep') {
 } else if (tool === 'gitleaks') {
   const input = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
   findings = convertGitleaks(input, { root });
+} else if (tool === 'kube-score') {
+  const text = fs.readFileSync(textFile, 'utf8');
+  findings = parseKubeScore(text);
 } else {
   console.error(`[normalize] tool inconnu: ${tool}`);
   process.exit(1);
