@@ -64,9 +64,38 @@ Les champs clés (`tool`, `category`, `severity`, `ruleId`, `file`, `line`, `mes
 sont communs à tous les formats. Le scoring traite n'importe quel finding tant qu'il
 a un `category` et un `severity` dans les poids.
 
-**Score V1** : 11 findings (3 SemGrep + 4 Trivy + 4 Gitleaks) → score cumulé 102/10 → BLOCK.
+**Score V1** : 11 findings (3 SemGrep + 4 Trivy + 4 Gitleaks) → score cumulé 88/10 → BLOCK.
 Les poids `secrets: 2.0` donnent plus de poids aux findings de Gitleaks, ce qui est cohérent
 (les secrets en dur sont plus critiques qu'un CVE sur une dépendance).
+
+## Limitation connue : Gitleaks `--no-git` (V1)
+
+**Contexte** : pour permettre un test PASS déterministe sur un module isolé du monorepo,
+Gitleaks est lancé avec `--no-git` (scan du working tree uniquement, pas de l'historique git).
+
+**Impact** : un secret commité puis supprimé du code mais présent dans un ancien commit
+ne serait pas détecté par le pipeline V1. En production, Gitleaks scanne par défaut
+l'historique git complet (`fetch-depth: 0` chez Orbitask) — c'est le vrai risque.
+
+**Justification** : le monorepo contient à la fois le code sain (`test/fixtures/clean-app`)
+et le code vulnérable (`app/`). Sans `--no-git`, Gitleaks trouve toujours les secrets
+du reste du repo, même sur le fixture sain → le test PASS ne passe jamais → le gate
+ne discrimine plus rien.
+
+**Decision** : compromis acceptable pour V1 (module isolé, démo fonctionnelle). Réévaluation
+en V2 lorsque le code sera séparé en modules indépendants, ou ajout d'un flag `--git`
+conditionnel (production vs test).
+
+## Score V0 → V1 : évolution
+
+| Version | Outils | Score | Seuil | Décision |
+|---------|--------|-------|-------|----------|
+| V0 | SemGrep (1) | 18/10 | 10 | BLOCK |
+| V1 | SemGrep + Trivy + Gitleaks (3) | 88/10 | 10 | BLOCK |
+
+L'évolution de 18 à 88 est attendue : 3 outils supplémentaires = plus de findings = score
+plus élevé. Le seuil 10 reste pertinent (score propre = 0, score vulnérable = 88).
+Recalibrage possible en V2 avec l'historique des runs MongoDB.
 
 ## Alternatives écartées
 

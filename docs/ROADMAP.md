@@ -39,27 +39,26 @@ porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/D
 
 ---
 
-## V1 — Phase 1 complète (les 4 outils) ✅ **EN COURS**
+## V1 — Phase 1 complète (les 4 outils) ✅ **TERMINÉ**
 
 **Objectif** : étendre V0 aux 4 outils en parallèle, sur un module réel, pivot + scoring capables d'absorber des sources hétérogènes.
 
 | # | Étape | Statut |
 |---|-------|--------|
 | 1 | Trivy (SCA) + Gitleaks (secrets) en parallèle de SemGrep | ✅ Tests isolés OK |
-| 2 | Scan Trivy de l'image container après build | ⏳ Attente Docker |
+| 2 | Scan Trivy de l'image container après build | ✅ `mean-app:local` → 23 findings container |
 | 3 | Étendre le format pivot aux 4 sources | ✅ `normalize/src/trivy.js`, `gitleaks.js`, `merge.js` |
 | 4 | Pondération par catégorie d'outil documentée | ✅ `weights.json` (sast=1, sca=1, secrets=2, container=1.2) |
 | 5 | Mécanisme basique de filtrage du bruit | ✅ `filterNoise()` existant |
 | 6 | Logs d'audit minimaux | ✅ `decision.log` par outil + merge |
-| 7 | E2E local : 3 outils → pivot unifié → score cohérent | ✅ `v1-local.sh` → 12/12 OK, score 102/10 → BLOCK |
-| 8 | Jenkins : stages parallèles Trivy + Gitleaks | ⏳ En cours |
+| 7 | E2E local : 3 outils → pivot unifié → score cohérent | ✅ `v1-local.sh` → 10/10 OK, score 88/10 → BLOCK |
+| 8 | Jenkins : stages parallèles + PASS path | ✅ Build #14 BLOCK + Build #9 PASS |
 
-**Critère de passage V1** : les 3 outils sur le même repo → pivot unifié (11 findings) →
-score cohérent (102/10) → BLOCK. **VALIDÉ localement.**
+**Critère de passage V1 — VALIDÉ** : les 3 outils filesystem sur le même repo → pivot unifié (11 findings) → score cohérent (88/10) → BLOCK. PASS path : fixture sain → 0 findings → PASS 0/10. Rétrocompatibilité V0 maintenue.
 
-**Questions répondues**
-- La structure pivot tient-elle avec un format totalement différent ? → Oui : chaque outil a un normalisateur dédié (`trivy.js`, `gitleaks.js`), le pivot est le format interne.
-- Comment choisir le seuil de départ ? → V0: 10 (score 18/10). V1: recalibré avec 3 outils (score 102/10, seuil reste 10). Documenté dans ADR-0001.
+**Limitations connues**
+- Gitleaks `--no-git` : ne scanne que le working tree, pas l'historique git. Un secret commité puis supprimé ne serait pas détecté. Documenté dans [ADR-0001](ADR/ADR-0001-threshold-v0.md).
+- Score 88/10 : évolution de 18/10 (V0) à 88/10 (V1) attendue avec 3 outils supplémentaires. Seuil 10 toujours pertinent. Recalibrage possible en V2.
 
 ---
 
@@ -67,12 +66,14 @@ score cohérent (102/10) → BLOCK. **VALIDÉ localement.**
 
 **Objectif** : pipeline présentable et robuste.
 
-1. Dashboard minimal (statut par module, historique des runs) — Angular + Express sur la pipeline DB (MongoDB).
-2. Rapport exécutif IA à partir des résultats normalisés (`pipeline/ai/report.js`).
-3. Vérification HMAC sur le webhook GitHub.
-4. Centralisation des secrets dans Jenkins Credentials.
-5. Notifications email/Slack en cas de blocage.
-6. Stratégie de résilience timeout/plantage d'un job de scan.
+| # | Étape | Statut |
+|---|-------|--------|
+| 1 | Vérification HMAC sur le webhook GitHub | ⏳ |
+| 2 | Centralisation des secrets dans Jenkins Credentials | ⏳ |
+| 3 | Dashboard minimal (statut par module, historique des runs) — Angular + Express sur MongoDB | ⏳ |
+| 4 | Rapport exécutif IA à partir des résultats normalisés (`pipeline/ai/report.js`) | ⏳ |
+| 5 | Notifications email/Slack en cas de blocage | ⏳ |
+| 6 | Stratégie de résilience timeout/plantage d'un job de scan | ⏳ |
 
 **Critère de passage** : un run affiché dans le dashboard, un rapport IA généré, un webhook HMAC validé.
 
