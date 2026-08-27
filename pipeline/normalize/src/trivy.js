@@ -9,9 +9,12 @@ function hashId(parts) {
 
 function convertTrivy(report, { root }) {
   const findings = [];
+  const isImage = report.ArtifactType === 'image' || report.ArtifactType === 'container_image';
 
   for (const result of report.Results || []) {
     const target = result.Target || '';
+    const category = isImage ? 'container' : 'sca';
+
     for (const vuln of result.Vulnerabilities || []) {
       const file = target;
       const severity = (vuln.Severity || 'medium').toLowerCase();
@@ -19,7 +22,7 @@ function convertTrivy(report, { root }) {
       findings.push({
         id: hashId(['trivy', vuln.VulnerabilityID, file, vuln.PkgName]),
         tool: 'trivy',
-        category: 'sca',
+        category,
         severity,
         confidence: 1.0,
         ruleId: vuln.VulnerabilityID,

@@ -46,12 +46,25 @@ NM=$(node -e "const p=require('$OUT/pivot.json'); console.log(p.findings.length)
 if [ "$NM" -eq $((N1 + N2 + N3)) ]; then ok "Merge: $NM findings (somme des 3 outils)"; else fail "Merge: $NM findings (attendu $((N1 + N2 + N3)))"; fi
 
 step "5. Scoring agrégé (seuil 10)"
-node score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json" --fail-on BLOCK | sed 's/^/   /'
+set +e
+node score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json" --fail-on BLOCK > /dev/null 2>&1
+set -e
 D=$(node -e "console.log(require('$OUT/decision.json').decision)")
 S=$(node -e "console.log(require('$OUT/decision.json').totalScore)")
 if [ "$D" = "BLOCK" ]; then ok "décision = BLOCK (score $S ≥ seuil 10)"; else fail "décision = $D (attendu BLOCK)"; fi
 
-step "6. Vérification par outil (seuils individuels)"
+step "6. Scan d'image Docker"
+if docker image inspect mean-app:local > /dev/null 2>&1; then
+  echo "   image mean-app:local déjà construite, on la réutilise"
+else
+  docker build -t mean-app:local "$REPO_ROOT/app/server" > "$OUT/docker-build.log" 2>&1
+fi
+trivy image --format json --severity HIGH,CRITICAL mean-app:local > "$OUT/trivy-image.json" 2>/dev/null
+node normalize/src/index.js --json "$OUT/trivy-image.json" --tool trivy --out "$OUT/pivot-image.json" | sed 's/^/   /'
+NI=$(node -e "const p=require('$OUT/pivot-image.json'); console.log(p.findings.length)")
+if [ "$NI" -gt 0 ]; then ok "Trivy image: $NI finding(s) (attendu >0)"; else fail "Trivy image: 0 findings (attendu >0)"; fi
+
+step "7. Vérification par outil (seuils individuels)"
 # SemGrep seul → BLOCK (score 18)
 node score/src/index.js "$OUT/pivot-semgrep.json" --out "$OUT/decision-semgrep.json" > /dev/null
 DS=$(node -e "console.log(require('$OUT/decision-semgrep.json').decision)")
