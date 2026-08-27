@@ -140,11 +140,8 @@ pipeline {
         bash pipeline/scripts/save-run.sh "$OUT" 2>/dev/null
       '''
       script {
-        def decision = 'PASS'
-        try {
-          def d = readJSON file: "$OUT/decision.json"
-          decision = d.decision
-        } catch (e) {}
+        def decision = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).decision)\"", returnStdout: true).trim()
+        echo "Decision from decision.json: $decision"
         if (decision == 'BLOCK') {
           error("BLOCK: score depasse le seuil")
         }
