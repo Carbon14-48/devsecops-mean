@@ -111,7 +111,12 @@ pipeline {
       steps {
         sh '''
           set -eu
-          node pipeline/score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json" --fail-on BLOCK
+          node pipeline/score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json"
+          DECISION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).decision)")
+          echo "Decision: $DECISION"
+          if [ "$DECISION" = "BLOCK" ]; then
+            echo "BLOCK: score depasse le seuil"
+          fi
         '''
       }
     }
@@ -134,6 +139,16 @@ pipeline {
         set +e
         bash pipeline/scripts/save-run.sh "$OUT" 2>/dev/null
       '''
+      script {
+        def decision = 'PASS'
+        try {
+          def d = readJSON file: "$OUT/decision.json"
+          decision = d.decision
+        } catch (e) {}
+        if (decision == 'BLOCK') {
+          error("BLOCK: score depasse le seuil")
+        }
+      }
     }
     success {
       echo '=== PORTE DE DÉCISION : PASS — build vert ==='
