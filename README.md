@@ -32,10 +32,8 @@ devsecops-mean/
 | VULN-002 | Secret AWS en dur | `app/server/src/config.js` | SemGrep (Gitleaks en V1) |
 | VULN-003 | `lodash@4.17.15` avec CVE | `app/server/package.json` | vérifiée manuellement (npm audit), **détection automatisée en V1 (Trivy)** |
 
-> **Périmètre V0 = un seul outil : SemGrep** (consigne de la roadmap). VULN-003 est
-> documentée et sa CVE vérifiée manuellement via `npm audit` (hors pipeline) — elle
-> n'est **pas** branchée au scoring V0. Sa détection automatisée arrive en V1 avec
-> Trivy (SCA), au même titre que les secrets (Gitleaks).
+> **Périmètre V0** : un seul outil (SemGrep). **V1** : 3 outils (SemGrep + Trivy + Gitleaks)
+> → pivot unifié → score agrégé. VULN-003 et VULN-002 sont maintenant détectées automatiquement.
 
 ## Reproduire le V0 localement
 
@@ -55,6 +53,20 @@ Attendu : **7/7 OK** — app vulnérable → **BLOCK** (score 18/10), module sai
 
 En Jenkins, un seul push déclenche les deux jobs (webhook smee) :
 `devsecops-v0` (rouge/BLOCK) et `devsecops-v0-pass` (vert/PASS) — voir [docs/SETUP-JENKINS.md](docs/SETUP-JENKINS.md).
+
+## Reproduire le V1 localement
+
+```bash
+# 1. Installer Gitleaks (si pas déjà fait)
+curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz && tar xzf /tmp/gitleaks.tar.gz -C /tmp && sudo mv /tmp/gitleaks /usr/local/bin/
+
+# 2. Test E2E avec les 3 outils
+pipeline/scripts/v1-local.sh
+```
+
+Attendu : **12/12 OK** — SemGrep (3) + Trivy (4) + Gitleaks (4) = 11 findings
+→ pivot unifié → score **102/10** → **BLOCK**. Le scoring agrège les 3 catégories
+(SAST, SCA, secrets) avec les poids documentés dans `pipeline/score/config/weights.json`.
 
 ## Principe d'architecture
 

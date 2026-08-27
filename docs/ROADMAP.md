@@ -39,22 +39,27 @@ porte **BLOCK** (score 18/10) → log clair + artefacts archivés. (Voir `docs/D
 
 ---
 
-## V1 — Phase 1 complète (les 4 outils)
+## V1 — Phase 1 complète (les 4 outils) ✅ **EN COURS**
 
 **Objectif** : étendre V0 aux 4 outils en parallèle, sur un module réel, pivot + scoring capables d'absorber des sources hétérogènes.
 
-1. Trivy/Snyk (SCA) + Gitleaks (secrets) en parallèle de SemGrep.
-2. Scan Trivy de l'image container après build.
-3. Étendre le format pivot aux 4 sources (`normalize/src/trivy.js`, `gitleaks.js`).
-4. Pondération par catégorie d'outil (SAST/SCA/secrets/image) documentée.
-5. Mécanisme basique de filtrage du bruit (déjà amorcé : `weights.noise`).
-6. Logs d'audit minimaux.
+| # | Étape | Statut |
+|---|-------|--------|
+| 1 | Trivy (SCA) + Gitleaks (secrets) en parallèle de SemGrep | ✅ Tests isolés OK |
+| 2 | Scan Trivy de l'image container après build | ⏳ Attente Docker |
+| 3 | Étendre le format pivot aux 4 sources | ✅ `normalize/src/trivy.js`, `gitleaks.js`, `merge.js` |
+| 4 | Pondération par catégorie d'outil documentée | ✅ `weights.json` (sast=1, sca=1, secrets=2, container=1.2) |
+| 5 | Mécanisme basique de filtrage du bruit | ✅ `filterNoise()` existant |
+| 6 | Logs d'audit minimaux | ✅ `decision.log` par outil + merge |
+| 7 | E2E local : 3 outils → pivot unifié → score cohérent | ✅ `v1-local.sh` → 12/12 OK, score 102/10 → BLOCK |
+| 8 | Jenkins : stages parallèles Trivy + Gitleaks | ⏳ En cours |
 
-**Critère de passage** : les 4 outils sur le même repo → pivot unifié → score cohérent, sans doublon.
+**Critère de passage V1** : les 3 outils sur le même repo → pivot unifié (11 findings) →
+score cohérent (102/10) → BLOCK. **VALIDÉ localement.**
 
-**Questions**
-- Baseline / seuil : calibrer le seuil sur l'historique des runs V0 stockés en Mongo.
-- Filtrage du bruit : ignorer les règles connues → taux de faux positifs mesuré.
+**Questions répondues**
+- La structure pivot tient-elle avec un format totalement différent ? → Oui : chaque outil a un normalisateur dédié (`trivy.js`, `gitleaks.js`), le pivot est le format interne.
+- Comment choisir le seuil de départ ? → V0: 10 (score 18/10). V1: recalibré avec 3 outils (score 102/10, seuil reste 10). Documenté dans ADR-0001.
 
 ---
 

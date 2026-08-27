@@ -50,6 +50,24 @@ normaliser en 0-100 (surcharge de logique inutile pour un seuil fixe arbitraire)
   de vulns de sévérité haute.
 - Filtrage du bruit : `weights.noise.minConfidence` + `ignoredRules`.
 
+## Pivot multi-source (V1)
+
+**Question** : la structure pivot tient-elle si on ajoute un 2e outil au format totalement différent ?
+
+**Réponse** : Oui. Le pivot est un format interne agnostique. Chaque outil a un normalisateur dédié :
+- `normalize/src/semgrep.js` : SARIF → pivot (`category: "sast"`)
+- `normalize/src/trivy.js` : JSON Trivy → pivot (`category: "sca"`)
+- `normalize/src/gitleaks.js` : JSON Gitleaks → pivot (`category: "secrets"`)
+- `normalize/src/merge.js` : fusionne N pivots en un seul
+
+Les champs clés (`tool`, `category`, `severity`, `ruleId`, `file`, `line`, `message`)
+sont communs à tous les formats. Le scoring traite n'importe quel finding tant qu'il
+a un `category` et un `severity` dans les poids.
+
+**Score V1** : 11 findings (3 SemGrep + 4 Trivy + 4 Gitleaks) → score cumulé 102/10 → BLOCK.
+Les poids `secrets: 2.0` donnent plus de poids aux findings de Gitleaks, ce qui est cohérent
+(les secrets en dur sont plus critiques qu'un CVE sur une dépendance).
+
 ## Alternatives écartées
 
 - **IA générative comme décideur** : risque d'hallucination → le gate reste déterministe.

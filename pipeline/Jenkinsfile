@@ -1,6 +1,6 @@
-// DevSecOps V0 — chaîne minimale orchestrée par Jenkins.
-// Les 4 dernières étapes réutilisent exactement les scripts testés en local
-// (pipeline/normalize, pipeline/score) — Jenkins ne fait qu'orchestrer.
+// DevSecOps V1 — chaîne minimale orchestrée par Jenkins.
+// 3 outils en parallèle (SemGrep SAST, Trivy SCA, Gitleaks Secrets)
+// → normalisation → merge → scoring → porte de décision.
 //
 // Déclencheur : push GitHub (webhook basique, HMAC en V2).
 // Paramètre du job : SCAN_ROOT (défaut "app") — ex. "test/fixtures/clean-app"
@@ -11,6 +11,7 @@ pipeline {
 
   environment {
     OUT = 'pipeline/out'
+    GITLEAKS = "$HOME/devsecops-tools/gitleaks"
   }
 
   options {
@@ -24,37 +25,72 @@ pipeline {
         sh '''
           set -eu
           mkdir -p "$HOME/devsecops-tools"
+          # SemGrep
           if [ ! -x "$HOME/devsecops-tools/semgrep-venv/bin/semgrep" ]; then
-            echo "[provision] création du venv semgrep (une seule fois)"
+            echo "[provision] création du venv semgrep"
             python3 -m venv "$HOME/devsecops-tools/semgrep-venv"
             "$HOME/devsecops-tools/semgrep-venv/bin/pip" install -q semgrep
           fi
           "$HOME/devsecops-tools/semgrep-venv/bin/semgrep" --version
+          # Gitleaks
+          if [ ! -x "$GITLEAKS" ]; then
+            echo "[provision] téléchargement de gitleaks"
+            curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+            tar xzf /tmp/gitleaks.tar.gz -C /tmp
+            mv /tmp/gitleaks "$GITLEAKS"
+            chmod +x "$GITLEAKS"
+          fi
+          "$GITLEAKS" version
         '''
       }
     }
 
-    stage('1. Scan SAST (SemGrep)') {
+    stage('Scans parallèles') {
+      parallel {
+        stage('1. Scan SAST (SemGrep)') {
+          steps {
+            sh '''
+              set -eu
+              SEMGREP="$HOME/devsecops-tools/semgrep-venv/bin/semgrep"
+              mkdir -p "$OUT"
+              "$SEMGREP" scan --config pipeline/rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" "${SCAN_ROOT:-app}"
+            '''
+          }
+        }
+        stage('2. Scan SCA (Trivy)') {
+          steps {
+            sh '''
+              set -eu
+              mkdir -p "$OUT"
+              trivy fs --format json --severity HIGH,CRITICAL "${SCAN_ROOT:-app/server}" > "$OUT/trivy.json"
+            '''
+          }
+        }
+        stage('3. Scan Secrets (Gitleaks)') {
+          steps {
+            sh '''
+              set -eu
+              mkdir -p "$OUT"
+              "$GITLEAKS" detect --config .gitleaks.toml --report-format json --report-path "$OUT/gitleaks.json" -v . > "$OUT/gitleaks.log" 2>&1 || true
+            '''
+          }
+        }
+      }
+    }
+
+    stage('4. Normalisation + Merge') {
       steps {
         sh '''
           set -eu
-          SEMGREP="$HOME/devsecops-tools/semgrep-venv/bin/semgrep"
-          mkdir -p "$OUT"
-          "$SEMGREP" scan --config pipeline/rules/semgrep.yml --sarif -o "$OUT/semgrep.sarif" "${SCAN_ROOT:-app}"
+          node pipeline/normalize/src/index.js --sarif "$OUT/semgrep.sarif" --tool semgrep --out "$OUT/pivot-semgrep.json"
+          node pipeline/normalize/src/index.js --json "$OUT/trivy.json" --tool trivy --out "$OUT/pivot-trivy.json"
+          node pipeline/normalize/src/index.js --json "$OUT/gitleaks.json" --tool gitleaks --out "$OUT/pivot-gitleaks.json"
+          node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" --out "$OUT/pivot.json"
         '''
       }
     }
 
-    stage('2. Normalisation SARIF → pivot') {
-      steps {
-        sh '''
-          set -eu
-          node pipeline/normalize/src/index.js --sarif "$OUT/semgrep.sarif" --out "$OUT/pivot.json"
-        '''
-      }
-    }
-
-    stage('3. Scoring + porte de décision') {
+    stage('5. Scoring + porte de décision') {
       steps {
         sh '''
           set -eu
@@ -66,8 +102,8 @@ pipeline {
 
   post {
     always {
-      echo '=== ARCHIVES DU RUN (SARIF, pivot, décision, log) ==='
-      archiveArtifacts artifacts: 'pipeline/out/semgrep.sarif, pipeline/out/pivot.json, pipeline/out/decision.json, pipeline/out/decision.log', allowEmptyArchive: true
+      echo '=== ARCHIVES DU RUN (pivots, décision, log) ==='
+      archiveArtifacts artifacts: 'pipeline/out/*.sarif, pipeline/out/*.json, pipeline/out/*.log', allowEmptyArchive: true
     }
     success {
       echo '=== PORTE DE DÉCISION : PASS — build vert ==='
