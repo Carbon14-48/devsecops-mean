@@ -61,6 +61,15 @@
       <div class="card"><div class="label">Seuil</div><div class="value" id="threshold">—</div></div>
     </div>
 
+    <div class="cards" id="categoryCards">
+      <div class="card"><div class="label">SAST</div><div class="value" id="sastCount">—</div></div>
+      <div class="card"><div class="label">SCA</div><div class="value" id="scaCount">—</div></div>
+      <div class="card"><div class="label">Secrets</div><div class="value" id="secretsCount">—</div></div>
+      <div class="card"><div class="label">K8s</div><div class="value" id="k8sCount">—</div></div>
+      <div class="card"><div class="label">DAST</div><div class="value" id="dastCount">—</div></div>
+      <div class="card"><div class="label">Container</div><div class="value" id="containerCount">—</div></div>
+    </div>
+
     <div class="section">
       <div class="section-header">Top Findings</div>
       <div class="section-body">
@@ -125,6 +134,16 @@
 
         document.getElementById('findings').textContent = d.filteredFindings + ' / ' + d.rawFindings;
         document.getElementById('threshold').textContent = d.blockThreshold;
+
+        // Category breakdown from top findings
+        const cats = { sast: 0, sca: 0, secrets: 0, k8s: 0, dast: 0, container: 0 };
+        (d.top || []).forEach(f => { if (cats[f.category] !== undefined) cats[f.category]++; });
+        document.getElementById('sastCount').textContent = cats.sast;
+        document.getElementById('scaCount').textContent = cats.sca;
+        document.getElementById('secretsCount').textContent = cats.secrets;
+        document.getElementById('k8sCount').textContent = cats.k8s;
+        document.getElementById('dastCount').textContent = cats.dast;
+        document.getElementById('containerCount').textContent = cats.container;
       }
 
       if (status.latest && status.latest.top) {
