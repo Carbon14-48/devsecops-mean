@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { callLLM, formatLLMSection } = require('./llm');
 
 const SEVERITY_LABELS = {
   critical: 'CRITIQUE',
@@ -205,10 +206,20 @@ function buildReport(pivot, decision) {
   return lines.join('\n');
 }
 
-function run(pivotPath, decisionPath, outPath) {
+async function run(pivotPath, decisionPath, outPath) {
   const pivot = JSON.parse(fs.readFileSync(pivotPath, 'utf8'));
   const decision = JSON.parse(fs.readFileSync(decisionPath, 'utf8'));
-  const report = buildReport(pivot, decision);
+  let report = buildReport(pivot, decision);
+
+  console.log('[report] deterministic report built');
+  console.log('[report] calling LLM (Gemini)...');
+  const llm = await callLLM(pivot, decision);
+  if (llm) {
+    report += formatLLMSection(llm);
+    console.log('[report] LLM summary appended');
+  } else {
+    console.log('[report] LLM unavailable — deterministic report only');
+  }
 
   if (outPath) {
     fs.writeFileSync(outPath, report, 'utf8');
@@ -224,8 +235,8 @@ if (require.main === module) {
     console.error('Usage: node report.js <pivot.json> <decision.json> [output.txt]');
     process.exit(1);
   }
-  const report = run(pivotPath, decisionPath, outPath || pivotPath.replace('pivot.json', 'report.txt'));
-  console.log(report);
+  run(pivotPath, decisionPath, outPath || pivotPath.replace('pivot.json', 'report.txt'))
+    .catch(err => { console.error('[report] fatal:', err.message); process.exit(1); });
 }
 
 module.exports = { buildReport, run };

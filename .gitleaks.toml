@@ -9,6 +9,7 @@ paths = [
   '''app/server/node_modules/''',
   '''docs/''',
   '''app/inject/''',
+  '''README\.md$''',
   '''\.sarif$''',
   '''\.log$''',
   '''pivot-.*\.json$''',
