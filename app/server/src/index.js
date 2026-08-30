@@ -20,6 +20,13 @@ function connectDB(retries = 10, delay = 3000) {
 }
 connectDB();
 
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'DevSecOps MEAN API',
+    version: '1.0.0',
+    endpoints: ['/health', '/api/books', '/api/search', '/api/auth'],
+  });
+});
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/books', books);
