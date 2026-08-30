@@ -4,8 +4,11 @@ title = "DevSecOps MEAN — Gitleaks config"
 description = "Global allowlist — exclusions de chemins"
 paths = [
   '''pipeline/out/''',
+  '''pipeline/runs/''',
   '''pipeline/.venv/''',
   '''app/server/node_modules/''',
+  '''docs/''',
+  '''app/inject/''',
   '''\.sarif$''',
   '''\.log$''',
   '''pivot-.*\.json$''',

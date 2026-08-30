@@ -9,10 +9,16 @@ const auth = require('./routes/auth');
 const app = express();
 app.use(express.json());
 
-mongoose
-  .connect(config.mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('[db] connected'))
-  .catch((err) => console.error('[db] connection error:', err.message));
+function connectDB(retries = 10, delay = 3000) {
+  mongoose
+    .connect(config.mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('[db] connected'))
+    .catch((err) => {
+      console.error(`[db] connection error (${retries} left):`, err.message);
+      if (retries > 0) setTimeout(() => connectDB(retries - 1, delay), delay);
+    });
+}
+connectDB();
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

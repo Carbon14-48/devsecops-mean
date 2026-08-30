@@ -10,7 +10,7 @@ const apiKey = 'AKIAIOSFODNN7EXAMPLE';
 
 module.exports = {
   port: 3000,
-  mongoUri: 'mongodb://localhost:27017/devsecops',
+  mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/devsecops',
   apiKey,
   dbPassword: 'admin123',
 };
