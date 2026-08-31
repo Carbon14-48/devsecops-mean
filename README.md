@@ -12,7 +12,7 @@ Pipeline DevSecOps complet avec **moteur de décision IA** sur une application *
 |---------|----------|--------|-------|--------|
 | **V0** | Chaîne minimale (1 module, 1 outil) | SemGrep | 18/10 | ✅ TERMINÉ & DÉMONTRÉ |
 | **V1** | 3 outils en parallèle + scoring | SemGrep + Trivy + Gitleaks | 88/10 | ✅ TERMINÉ & DÉMONTRÉ |
-| **V2** | Dashboard, rapport IA, webhooks, archival | + Express API + Gemini LLM + notify + HMAC | 88/10 | ✅ TERMINÉ & DÉMONTRÉ |
+| **V2** | Dashboard, rapport IA, webhooks, archival | + Express API + Groq LLM + notify + HMAC + Jenkins Credentials | 217/10 | ✅ TERMINÉ & DÉMONTRÉ |
 | **V3** | K8s + DAST + composition + rollback | + kube-score + ZAP + composition | 217/10 | ⚠️ CODE PRÊT, LIVE NON DÉMONTRÉ |
 
 ---
@@ -205,18 +205,30 @@ Score = Σ (sévérité × catégorie)
 
 ### Seuil de blocage : 10 (configurable)
 
-### Score de référence (stable)
+### Score de référence (stable) — séparé Phase 1 / Phase 2
+
+**Phase 1 — V0-V2 (cœur du pipeline) :**
 
 | Composant | Findings | Score |
 |-----------|----------|-------|
 | SemGrep (SAST) | 3 | 14 pts |
 | Trivy (SCA) | 4 | 28 pts |
 | Gitleaks (Secrets) | 2 | 28 pts |
-| kube-score (K8s) | 15 | 7 pts |
-| Composition | 6 | 20 pts |
-| **Total** | **30** | **217 pts** |
+| **Phase 1 total** | **9** | **74 pts** |
 
-**Historique du score** (avant fix du drift) :
+**Phase 2 — V3 (ajouts K8s + composition) :**
+
+| Composant | Findings | Score |
+|-----------|----------|-------|
+| kube-score (K8s) | 15 | 7 pts |
+| Composition | 6 | 136 pts |
+| **Phase 2 total** | **21** | **+143 pts** |
+
+**Total (Phase 1 + Phase 2) : 30 findings → 217 pts**
+
+> Voir [ADR-0002](docs/ADR/ADR-0002-score-aggregation.md) pour la justification de la séparation Phase 1/Phase 2.
+
+**Historique du score** :
 - V0 : 18 → V1 : 88 → V3 : 231 → **Fix drift : 217 (stable)**
 
 ---
@@ -225,7 +237,9 @@ Score = Σ (sévérité × catégorie)
 
 ```
 Stage 1: HMAC verification
-  └── Vérifie le secret webhook GitHub ($HOME/.jenkins/secrets/webhook-hmac-secret)
+  ├── Secret chargé depuis Jenkins Credentials (github-webhook-secret)
+  ├── Preuve HMAC-SHA256 calculée sur payload test
+  └── Limitation smee documentée (relay strip signature)
 
 Stage 2: Provision outils
   ├── SemGrep: pip install dans venv
@@ -241,15 +255,18 @@ Stage 3: Scans parallèles (3 × retry avec fallback vide)
 
 Stage 4: Normalisation + Merge
   ├── Chaque outil → format pivot (JSON normalisé)
-  ├── kube-score score k8s/base/*.yaml → pivot-kube-score.json
-  ├── composition.js → pivot-composition.json
-  └── merge → pivot.json (tous les findings fusionnés)
+  ├── Phase 1 pivot: semgrep+trivy+gitleaks → pivot-phase1.json
+  ├── Phase 2: + kube-score + composition → pivot.json
 
 Stage 5: Scoring + porte de décision
-  └── engine.js: pivot.json → decision.json (BLOCK/PASS + score)
+  ├── Phase 1: pivot-phase1.json → decision-phase1.json (V0-V2 score)
+  ├── Total: pivot.json → decision.json (Phase 1 + Phase 2 = total score)
+  └── decision.json inclut phase1.score + phase2Contribution
 
 Stage 6: Rapport exécutif
-  └── report.js: pivot.json + decision.json → report.txt (langage naturel)
+  ├── Affiche Phase 1 (V0-V2) + Phase 2 (V3) séparément
+  ├── Appel LLM (Groq) → section RÉSUMÉ EXÉCUTIF en langage naturel
+  └── report.txt = rapport déterministe + section IA
 
 Stage 7: Post
   ├── Archivage artifacts (14 fichiers)
@@ -482,10 +499,9 @@ Score **217** stable sur 3 builds consécutifs (#27, #28, #29, #30).
 
 ## Ce qui reste à faire
 
-### Bloqué
+### Bloqué (contraintes réseau/environnement)
 
-- [ ] **Gemini API** — Clé générée mais accès 403. À activer dans Google Cloud Console > APIs > Generative Language API > Enable
-- [ ] **Argo CD** — Docker Hub injoignable depuis cette machine (DNS intermittent `registry-1.docker.io`)
+- [ ] **Argo CD** — Docker Hub injoignable (DNS intermittent `registry-1.docker.io`)
 - [ ] **K8s cluster** — k3d supprimé (CoreDNS ImagePullBackOff), à recréer après fix Docker DNS
 - [ ] **ZAP DAST** — image Docker non tirée (même problème DNS)
 
@@ -505,13 +521,13 @@ sudo systemctl restart docker
 - [ ] TLS/Ingress avec cert-manager
 - [ ] Monitoring (Prometheus + Grafana)
 - [ ] Log aggregation (EFK stack)
-- [ ] Slack webhook en dur dans notify.sh (remplacer par env var)
 
 ---
 
 ## Architecture Decision Records
 
 - [ADR-0001](docs/ADR/ADR-0001-threshold-v0.md) : Seuil de décision V0 + limitation Gitleaks `--no-git`
+- [ADR-0002](docs/ADR/ADR-0002-score-aggregation.md) : Agrégation score Phase 1 (V0-V2) + Phase 2 (V3)
 
 ---
 
