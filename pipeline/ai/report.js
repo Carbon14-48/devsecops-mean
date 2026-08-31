@@ -212,7 +212,7 @@ async function run(pivotPath, decisionPath, outPath) {
   let report = buildReport(pivot, decision);
 
   console.log('[report] deterministic report built');
-  console.log('[report] calling LLM (Gemini)...');
+  console.log('[report] calling LLM (Groq)...');
   const llm = await callLLM(pivot, decision);
   if (llm) {
     report += formatLLMSection(llm);

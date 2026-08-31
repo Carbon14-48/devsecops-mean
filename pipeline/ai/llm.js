@@ -4,15 +4,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const TIMEOUT_MS = 30_000;
 
 function loadKey() {
-  const envKey = process.env.GEMINI_API_KEY;
+  const envKey = process.env.GROQ_API_KEY;
   if (envKey) return envKey;
   try {
-    return fs.readFileSync(path.join(os.homedir(), '.config', 'devsecops', 'gemini-key'), 'utf8').trim();
+    return fs.readFileSync(path.join(os.homedir(), '.config', 'devsecops', 'groq-key'), 'utf8').trim();
   } catch { return null; }
 }
 
@@ -63,7 +63,7 @@ Réponds STRICTEMENT en JSON valide (pas de markdown, pas de backticks) :
 async function callLLM(pivot, decision) {
   const apiKey = loadKey();
   if (!apiKey) {
-    console.error('[llm] no API key found (GEMINI_API_KEY or ~/.config/devsecops/gemini-key)');
+    console.error('[llm] no API key found (GROQ_API_KEY or ~/.config/devsecops/groq-key)');
     return null;
   }
 
@@ -74,7 +74,7 @@ async function callLLM(pivot, decision) {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const res = await fetch(GEMINI_ENDPOINT, {
+    const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,14 +94,14 @@ async function callLLM(pivot, decision) {
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error(`[llm] API error ${res.status}: ${body.slice(0, 200)}`);
+      console.error(`[llm] API error ${res.status}: ${body.slice(0, 300)}`);
       return null;
     }
 
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content;
     if (!raw) {
-      console.error('[llm] empty response from API');
+      console.error('[llm] empty response from Groq:', JSON.stringify(data).slice(0, 300));
       return null;
     }
 
@@ -119,7 +119,7 @@ function formatLLMSection(llm) {
   const lines = [];
   lines.push('');
   lines.push('═'.repeat(62));
-  lines.push('=== RÉSUMÉ EXÉCUTIF (généré par IA — Google Gemini) ===');
+  lines.push('=== RÉSUMÉ EXÉCUTIF (généré par IA — Groq Llama) ===');
   lines.push('═'.repeat(62));
   lines.push('');
 
