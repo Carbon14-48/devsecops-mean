@@ -94,7 +94,13 @@ function buildReport(pivot, decision) {
   lines.push('');
   lines.push(`  Date : ${now}`);
   lines.push(`  Décision : ${decision.decision}`);
-  lines.push(`  Score cumulé : ${decision.totalScore} / seuil ${decision.blockThreshold}`);
+  if (decision.phase1) {
+    lines.push(`  Score Phase 1 (V0-V2) : ${decision.phase1.score} pts  (${decision.phase1.findings} findings)`);
+    lines.push(`  Score Phase 2 (V3)    : +${decision.phase2Contribution} pts  (kube-score + composition)`);
+    lines.push(`  Score total           : ${decision.totalScore} / seuil ${decision.blockThreshold}`);
+  } else {
+    lines.push(`  Score cumulé : ${decision.totalScore} / seuil ${decision.blockThreshold}`);
+  }
   lines.push(`  Findings bruts : ${decision.rawFindings}  →  filtrés : ${decision.filteredFindings}`);
   lines.push('');
 

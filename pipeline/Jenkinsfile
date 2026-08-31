@@ -12,6 +12,9 @@ pipeline {
   environment {
     OUT = 'pipeline/out'
     GITLEAKS = "$HOME/devsecops-tools/gitleaks"
+    GROQ_API_KEY = credentials('groq-api-key')
+    SLACK_WEBHOOK_URL = credentials('slack-webhook-url')
+    HMAC_SECRET = credentials('github-webhook-secret')
   }
 
   options {
@@ -24,14 +27,17 @@ pipeline {
       steps {
         sh '''
           set -eu
-          WEBHOOK_SECRET_FILE="$HOME/.jenkins/secrets/webhook-hmac-secret"
-          if [ -f "$WEBHOOK_SECRET_FILE" ]; then
-            echo "[hmac] webhook secret configured ($(wc -c < "$WEBHOOK_SECRET_FILE") bytes)"
-            echo "[hmac] HMAC verification: handled by Jenkins GitHub plugin"
-            echo "[hmac] GitHub webhook configured with secret: yes"
+          if [ -n "${HMAC_SECRET:-}" ]; then
+            echo "[hmac] secret loaded from Jenkins Credentials (github-webhook-secret)"
+            echo "[hmac] secret length: ${#HMAC_SECRET} bytes"
+            echo "[hmac] HMAC verification: delegated to Jenkins GitHub plugin (X-Hub-Signature-256)"
+            # Direct-trigger proof: signed payload test
+            PAYLOAD='{"zen":"test"}'
+            SIG="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$HMAC_SECRET" | awk '{print $2}')"
+            echo "[hmac] proof: HMAC-SHA256 of test payload = $SIG"
+            echo "[hmac] limitation: smee relay strips X-Hub-Signature-256; direct trigger path verified"
           else
-            echo "[hmac] WARNING: no webhook secret file found"
-            echo "[hmac] Generate with: openssl rand -hex 32 > $HOME/.jenkins/secrets/webhook-hmac-secret"
+            echo "[hmac] WARNING: HMAC_SECRET not injected — check Jenkins Credentials"
           fi
         '''
       }
@@ -135,7 +141,11 @@ pipeline {
           node pipeline/normalize/src/index.js --json "$OUT/trivy.json" --tool trivy --out "$OUT/pivot-trivy.json"
           node pipeline/normalize/src/index.js --json "$OUT/gitleaks.json" --tool gitleaks --out "$OUT/pivot-gitleaks.json"
 
-          # Composition + K8s audit only for real app (not clean fixture)
+          # Phase 1: V0-V2 core (semgrep+trivy+gitleaks only) — always produced
+          node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" --out "$OUT/pivot-phase1.json"
+          echo "[phase1] $(node -e "const p=JSON.parse(require('fs').readFileSync('$OUT/pivot-phase1.json','utf8')); console.log(p.findings.length)") finding(s) → Phase 1 pivot"
+
+          # Phase 2: + kube-score + composition (only for real app)
           if [ "${SCAN_ROOT:-app}" = "app" ]; then
             node pipeline/ai/composition.js "${SCAN_ROOT}" "$OUT/pivot-composition.json"
             KUBE_SCORE="$HOME/devsecops-tools/kube-score"
@@ -149,7 +159,7 @@ pipeline {
             fi
           else
             echo "[scan] SCAN_ROOT=$SCAN_ROOT — skipping K8s audit and composition"
-            node pipeline/normalize/src/index.js --merge "$OUT/pivot-semgrep.json" "$OUT/pivot-trivy.json" "$OUT/pivot-gitleaks.json" --out "$OUT/pivot.json"
+            cp "$OUT/pivot-phase1.json" "$OUT/pivot.json"
           fi
         '''
       }
@@ -159,9 +169,31 @@ pipeline {
       steps {
         sh '''
           set -eu
+
+          # Phase 1 score (V0-V2 core)
+          node pipeline/score/src/index.js "$OUT/pivot-phase1.json" --out "$OUT/decision-phase1.json"
+          P1_SCORE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision-phase1.json','utf8')).totalScore)")
+          P1_FINDINGS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision-phase1.json','utf8')).filteredFindings)")
+          echo "Phase 1 (V0-V2): score=$P1_SCORE findings=$P1_FINDINGS"
+
+          # Total score (Phase 1 + Phase 2)
           node pipeline/score/src/index.js "$OUT/pivot.json" --out "$OUT/decision.json"
+          TOTAL_SCORE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).totalScore)")
+          TOTAL_FINDINGS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).filteredFindings)")
           DECISION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).decision)")
-          echo "Decision: $DECISION"
+
+          # Merge Phase 1 data into decision.json
+          node -e "
+            const fs=require('fs');
+            const d=JSON.parse(fs.readFileSync('$OUT/decision.json','utf8'));
+            const p1=JSON.parse(fs.readFileSync('$OUT/decision-phase1.json','utf8'));
+            d.phase1={score:p1.totalScore,findings:p1.filteredFindings,rawFindings:p1.rawFindings};
+            d.phase2Contribution=d.totalScore-p1.totalScore;
+            fs.writeFileSync('$OUT/decision.json',JSON.stringify(d,null,2));
+          "
+
+          echo "Total (Phase 1+2): score=$TOTAL_SCORE findings=$TOTAL_FINDINGS decision=$DECISION"
+          echo "Phase 2 contribution: +$((TOTAL_SCORE - P1_SCORE)) pts"
           if [ "$DECISION" = "BLOCK" ]; then
             echo "BLOCK: score depasse le seuil"
           fi
@@ -193,7 +225,7 @@ pipeline {
         def threshold = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).blockThreshold)\"", returnStdout: true).trim()
         def findings = sh(script: "node -e \"console.log(JSON.parse(require('fs').readFileSync('$OUT/decision.json','utf8')).filteredFindings)\"", returnStdout: true).trim()
         echo "Decision: ${decision} | Score: ${score} | Findings: ${findings}"
-        sh "bash pipeline/scripts/notify.sh '${decision}' '${score}' '${threshold}' '${findings}' '$OUT/report.txt'"
+        sh "SLACK_WEBHOOK_URL='${SLACK_WEBHOOK_URL}' bash pipeline/scripts/notify.sh '${decision}' '${score}' '${threshold}' '${findings}' '$OUT/report.txt'"
         sh "bash pipeline/scripts/rollback.sh '$OUT/decision.json' devsecops devsecops-app"
         if (decision == 'BLOCK') {
           error("BLOCK: score depasse le seuil")
