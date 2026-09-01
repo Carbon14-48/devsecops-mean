@@ -170,7 +170,7 @@ devsecops-mean/
 | **Trivy** | SCA | 0.73.0 | `/usr/bin/trivy` | Scan des dépendances (CVEs) |
 | **Gitleaks** | Secrets | 8.30.1 | `~/devsecops-tools/gitleaks` | Détection de secrets exposés |
 | **kube-score** | K8s | 1.19.0 | `~/devsecops-tools/kube-score` | Audit de configuration Kubernetes |
-| **OWASP ZAP** | DAST | (Docker) | `ghcr.io/zaproxy/zaproxy` | Analyse dynamique (script prêt) |
+| **OWASP ZAP** | DAST | stable | `ghcr.io/zaproxy/zaproxy` | Analyse dynamique — **exécuté** (0 FAIL / 58 PASS / 3 WARN) |
 | **Composition** | Architecture | - | `node pipeline/ai/composition.js` | Analyse de la surface d'attaque |
 
 ### Config Gitleaks (`.gitleaks.toml`)
@@ -359,7 +359,7 @@ pm2 start dashboard/api/server.js --name dashboard
 
 `k8s/argocd-app.yaml` — Application manifest pour GitOps.
 
-Installé sur le cluster `devsecops` (namespace `argocd`, 7 pods Running/Ready). UI : `kubectl -n argocd port-forward svc/argocd-server 8080:80` (HTTPS auto-signé). Admin login vérifié ; Application `devsecops-mean` appliquée (Healthy). Synchronisation Git désactivée faute d'égrèsse réseau (voir "Ce qui reste à faire").
+Installé sur le cluster `devsecops` (namespace `argocd`, 7 pods Running/Ready). UI : `kubectl -n argocd port-forward svc/argocd-server 9090:80` puis `https://localhost:9090` (HTTPS auto-signé — accepter le certificat une fois). Identifiants : **`admin` / `4OKpXWRDqaW2oyH8`**. Application `devsecops-mean` appliquée et **Healthy**. Synchronisation Git live désactivée faute d'égrèsse réseau (voir "Ce qui reste à faire").
 
 ### Docker
 
@@ -380,6 +380,32 @@ kubectl apply -k k8s/overlays/dev
 
 ---
 
+## Scan DAST — OWASP ZAP (V3)
+
+Scan baseline ZAP exécuté contre l'application **déployée** sur le cluster (via le réseau k3d pour joindre la nodePort Traefik).
+
+| Métrique | Valeur |
+|----------|--------|
+| FAIL-NEW | **0** |
+| PASS | **58** |
+| WARN-NEW | 3 (mineurs) |
+| Cibles | `/` + routes API (ingress catch-all ajouté pour le scan) |
+
+Avertissements (mineurs) :
+- `10021` X-Content-Type-Options manquant
+- `10037` X-Powered-By exposé (fuite de version)
+- `10055` CSP : directive sans fallback
+
+Rapports : `pipeline/out/zap-report.html` (idéal pour capture), `.json`, `.xml`.
+
+```bash
+docker run --rm --network k3d-devsecops \
+  -v "$PWD/pipeline/out:/zap/wrk/:rw" ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py -t "http://172.18.0.3:32614/" -r zap-report.html -J zap-report.json -x zap-report.xml -I
+```
+
+---
+
 ## Services fonctionnels
 
 | Service | URL | Status |
@@ -387,7 +413,7 @@ kubectl apply -k k8s/overlays/dev
 | **Jenkins** | http://localhost:8080 | ✅ admin/admin |
 | **Dashboard** | http://localhost:3200 | ✅ PM2 daemon |
 | **App (K8s)** | http://localhost/ (Host: `devsecops.local`) | ✅ Ingress Traefik → 200 `{"status":"ok"}` |
-| **Argo CD** | port-forward `kubectl -n argocd port-forward svc/argocd-server 8080:80` | ✅ HTTPS auto-signé, admin |
+| **Argo CD** | port-forward `kubectl -n argocd port-forward svc/argocd-server 9090:80` | ✅ HTTPS auto-signé — `admin` / `4OKpXWRDqaW2oyH8` |
 | **Smee** | https://smee.io/Idi3niApFloU03v | ✅ → Jenkins |
 
 ### Commands de démarrage
@@ -500,6 +526,13 @@ Le score dérivait à chaque run (88→231→...) à cause de :
 
 Score **217** stable sur 3 builds consécutifs (#27, #28, #29, #30).
 
+### Fix complémentaire (sept. 2026) — Trivy devenu réel
+
+- Ajout de `--skip-db-update` dans le Jenkinsfile (stage SCA) : avant ce fix, Trivy tentait de télécharger sa DB et **pendait** (fallback vide → fausse note PASS 0/0). Désormais Trivy scanne avec la DB locale et le verdict est **honnête**.
+- E2E final (jobs avec leur SCAN_ROOT par défaut) :
+  - `devsecops-v0` (#36, target `app/`) → **FAILURE / BLOCK / 217 pts / 30 findings** (rouge) ✅ attendu
+  - `devsecops-v0-pass` (#26, target `test/fixtures/clean-app`) → **SUCCESS / PASS / 0 pts / 0 finding** (vert) ✅ attendu
+
 ---
 
 ## Ce qui reste à faire
@@ -539,6 +572,55 @@ docker run --rm --network k3d-devsecops \
 
 ---
 
+## Démo en direct — ordre recommandé
+
+### Prérequis (tout doit tourner)
+
+```bash
+export PATH="$HOME/devsecops-tools:$PATH"
+
+# 1. Cluster (déjà up normalement)
+kubectl get nodes
+kubectl get pods -A
+
+# 2. Jenkins (port 8080)
+bash infra/jenkins-start.sh --bg
+
+# 3. Argo CD (UI sur https://localhost:9090)
+kubectl -n argocd port-forward svc/argocd-server 9090:80 &
+
+# 4. Dashboard (port 3200)
+pm2 start dashboard/api/server.js --name dashboard 2>/dev/null || pm2 restart dashboard
+
+# 5. Smee (webhook GitHub → Jenkins)
+smee --url https://smee.io/Idi3niApFloU03v --target http://localhost:8080/github-webhook/ &
+```
+
+### Ordre de la démo (avec les captures)
+
+1. **Cluster K8s sain** — `kubectl get pods -A` → montrer tous les namespaces Running (kube-system, devsecops, argocd).
+2. **App live** — `curl -H "Host: devsecops.local" http://localhost/health` → `{"status":"ok"}` ; ouvrir `http://localhost/` (Host) dans le navigateur.
+3. **Argo CD** — `https://localhost:9090` → accepter le certificat, login `admin` / `4OKpXWRDqaW2oyH8` → page Applications → `devsecops-mean` **Healthy**.
+4. **Jenkins E2E** — job `devsecops-v0` → **BLOCK 217 (rouge)** ; job `devsecops-v0-pass` → **PASS 0 (vert)**. Montrer la porte de décision dans la console d'un build.
+5. **Dashboard** — `http://localhost:3200` → cards par catégorie (SAST, SCA, Secrets, K8s, DAST) + score cumulé + décision.
+6. **Rapport exécutif** — ouvrir `pipeline/out/report-*.txt` (déterministe + section LLM Groq) d'un run archivé dans `~/devsecops-runs/`.
+7. **ZAP DAST** — ouvrir `pipeline/out/zap-report.html` dans le navigateur → montrer 0 FAIL / 58 PASS / 3 WARN.
+8. **Docs/ADR** — README, ROADMAP, ADR-0001, ADR-0002, V2-HMAC-SETUP.
+
+### Checklist des captures d'écran (pour le rapport)
+
+1. `kubectl get pods -A` (3 colonnes : kube-system, devsecops, argocd — tout Running) ✅
+2. `curl /health` + réponse `{"status":"ok"}` (terminal) ✅
+3. Argo CD : écran de login / page Applications (`devsecops-mean` Healthy) ✅
+4. Jenkins : build `devsecops-v0` rouge (BLOCK 217) avec la "PORTE DE DÉCISION" dans la console ✅
+5. Jenkins : build `devsecops-v0-pass` vert (PASS 0/0) ✅
+6. Dashboard : vue générale avec cards de catégories ✅
+7. Rapport exécutif : `report.txt` (section IA Groq visible) ✅
+8. ZAP : `zap-report.html` (résumé 0 FAIL / 58 PASS / 3 WARN) ✅
+9. `git log --oneline` (les derniers commits V0→V3) ✅
+
+---
+
 ## Architecture Decision Records
 
 - [ADR-0001](docs/ADR/ADR-0001-threshold-v0.md) : Seuil de décision V0 + limitation Gitleaks `--no-git`
@@ -549,6 +631,10 @@ docker run --rm --network k3d-devsecops \
 ## Git history (derniers commits)
 
 ```
+5c0f93b docs: V3 démontré (k3d + Argo CD + ZAP DAST), E2E final v0 BLOCK 217 / v0-pass PASS 0, limites réseau documentées
+14935b0 fix: trivy --skip-db-update in Jenkinsfile to avoid hanging on DB download
+4fc5e2a docs: Phase1/Phase2 score separation + ADR-0002 + update V2 status
+dac2034 feat: V2 hardening — credentials, Phase1/Phase2 separation, noise-filter tests, HMAC proof, Slack notification
 5ee251b feat(app): add root route with API info
 4122c26 fix(pipeline): skip K8s audit and composition when SCAN_ROOT != app
 fc9971a fix(score): stabilize score by excluding docs/, app/inject/, pipeline/runs/
