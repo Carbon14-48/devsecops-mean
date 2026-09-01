@@ -95,7 +95,7 @@ pipeline {
               set +e
               mkdir -p "$OUT"
               for ATTEMPT in 1 2 3; do
-                trivy fs --format json --severity HIGH,CRITICAL "${SCAN_ROOT:-app/server}" > "$OUT/trivy.json" 2>"$OUT/trivy.err" && break
+                trivy fs --skip-db-update --format json --severity HIGH,CRITICAL "${SCAN_ROOT:-app/server}" > "$OUT/trivy.json" 2>"$OUT/trivy.err" && break
                 echo "[resilience] trivy attempt $ATTEMPT failed, retrying in ${ATTEMPT}0s..."
                 sleep $((ATTEMPT * 10))
               done
