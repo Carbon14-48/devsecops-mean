@@ -4,6 +4,8 @@
 
 Approuvé — 2026-08-31
 
+**Mise à jour démonstration (2026-09-01)** : les deux phases sont désormais exercées sur l'infra V3 réelle — phase 2 tourne `kube-score` sur les manifests déployés (`k8s/base/*.yaml`) et le scan DAST ZAP exécuté contre l'app live sur le cluster k3d (`devsecops`) alimente la catégorie DAST. E2E final Jenkins : v0 → BLOCK 217/30 (rouge), v0-pass → PASS 0/0 (vert), le rapport exécutif affiche bien les deux scores séparément (Phase 1 V0-V2 / Phase 2 V3).
+
 ## Contexte
 
 Le pipeline DevSecOps combine des outils de scan de sécurité à travers deux phases :

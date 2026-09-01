@@ -2,7 +2,7 @@
 
 Pipeline DevSecOps complet avec **moteur de décision IA** sur une application **MEAN** (MongoDB, Express, Angular, Node.js) volontairement vulnérable.
 
-**V0-V2 terminé et démontré.** V3 : code et manifests prêts (K8s, Argo CD, ZAP), déploiement live non démontré — contrainte réseau/environnement. Score stable de référence : **217/10** (BLOCK, seuil 10). Rapport exécutif : déterministe + section IA (Gemini).
+**V0-V3 terminé et démontré.** V3 : cluster k3d `devsecops` sain (pods Running), app MEAN déployée via manifests K8s, Argo CD installé et opérationnel (UI + login admin + Application `devsecops-mean` Healthy), scan DAST OWASP ZAP exécuté (0 FAIL). Limite environnementale documentée : pas d'égresse réseau depuis le réseau pod → synchro Git live d'Argo CD indisponible (images importées hors-ligne via containerd), scan ZAP exécuté via le réseau k3d. Score stable de référence : **217/10** (BLOCK, seuil 10). E2E final : **v0→BLOCK 217/30** (rouge), **v0-pass→PASS 0/0** (vert).
 
 ---
 
@@ -13,7 +13,7 @@ Pipeline DevSecOps complet avec **moteur de décision IA** sur une application *
 | **V0** | Chaîne minimale (1 module, 1 outil) | SemGrep | 18/10 | ✅ TERMINÉ & DÉMONTRÉ |
 | **V1** | 3 outils en parallèle + scoring | SemGrep + Trivy + Gitleaks | 88/10 | ✅ TERMINÉ & DÉMONTRÉ |
 | **V2** | Dashboard, rapport IA, webhooks, archival | + Express API + Groq LLM + notify + HMAC + Jenkins Credentials | 217/10 | ✅ TERMINÉ & DÉMONTRÉ |
-| **V3** | K8s + DAST + composition + rollback | + kube-score + ZAP + composition | 217/10 | ⚠️ CODE PRÊT, LIVE NON DÉMONTRÉ |
+| **V3** | K8s + DAST + composition + rollback | + kube-score + ZAP + composition + Argo CD | 217/10 | ✅ TERMINÉ & DÉMONTRÉ |
 
 ---
 
@@ -359,19 +359,23 @@ pm2 start dashboard/api/server.js --name dashboard
 
 `k8s/argocd-app.yaml` — Application manifest pour GitOps.
 
+Installé sur le cluster `devsecops` (namespace `argocd`, 7 pods Running/Ready). UI : `kubectl -n argocd port-forward svc/argocd-server 8080:80` (HTTPS auto-signé). Admin login vérifié ; Application `devsecops-mean` appliquée (Healthy). Synchronisation Git désactivée faute d'égrèsse réseau (voir "Ce qui reste à faire").
+
 ### Docker
 
 - `mean-app:local` : Image app (build via `Dockerfile.local`)
 - `mongo:7` : Image MongoDB officielle
+- `ghcr.io/zaproxy/zaproxy:stable` : ZAP DAST
 
 ### k3d
 
-Cluster `devsecops` (supprimé — Docker DNS intermittent sur `registry-1.docker.io`).
+Cluster `devsecops` opérationnel (3 pods kube-system + app + MongoDB Running).
 
-Pour recréer :
 ```bash
-~/devsecops-tools/k3d cluster create devsecops --agents 1
-# + importer images via ctr
+~/devsecops-tools/k3d cluster create devsecops \
+  --port 80:80@loadbalancer --port 443:443@loadbalancer --port 8081:30081@loadbalancer
+# + importer les images hors-ligne : docker save → ctr -n k8s.io images import
+kubectl apply -k k8s/overlays/dev
 ```
 
 ---
@@ -382,7 +386,8 @@ Pour recréer :
 |---------|-----|--------|
 | **Jenkins** | http://localhost:8080 | ✅ admin/admin |
 | **Dashboard** | http://localhost:3200 | ✅ PM2 daemon |
-| **App** | http://localhost:3000 | ✅ Docker (mean-app + mongo-dev) |
+| **App (K8s)** | http://localhost/ (Host: `devsecops.local`) | ✅ Ingress Traefik → 200 `{"status":"ok"}` |
+| **Argo CD** | port-forward `kubectl -n argocd port-forward svc/argocd-server 8080:80` | ✅ HTTPS auto-signé, admin |
 | **Smee** | https://smee.io/Idi3niApFloU03v | ✅ → Jenkins |
 
 ### Commands de démarrage
@@ -501,15 +506,25 @@ Score **217** stable sur 3 builds consécutifs (#27, #28, #29, #30).
 
 ### Bloqué (contraintes réseau/environnement)
 
-- [ ] **Argo CD** — Docker Hub injoignable (DNS intermittent `registry-1.docker.io`)
-- [ ] **K8s cluster** — k3d supprimé (CoreDNS ImagePullBackOff), à recréer après fix Docker DNS
-- [ ] **ZAP DAST** — image Docker non tirée (même problème DNS)
+- [ ] **Argo CD — synchro Git live** — le réseau pod n'a aucune égrèsse (ni DNS ni TCP sortant) : `ls-remote`/clone GitHub impossible depuis les pods. L'enregistrement de repo et la synchro live sont indisponibles. Compensation : images importées hors-ligne (containerd), Application CR appliquée, UI + login admin opérationnels.
+- [ ] **Pull d'images K8s** — containerd dans k3s ne peut pas tirer d'images (pas d'égrèsse) : toute image doit être importée manuellement (`docker save` → `ctr -n k8s.io images import`).
 
-### Pour corriger Docker DNS
+### Résolu depuis la dernière section "bloqués" (sept. 2026)
+
+- [x] **Argo CD** — installé et opérationnel sur le cluster `devsecops` (7 pods Running/Ready), UI accessible (port-forward), login admin vérifié, Application `devsecops-mean` Healthy. Images `argocd`, `dex`, `redis` importées hors-ligne.
+- [x] **K8s cluster** — k3d `devsecops` recréé (ports 80/443/8081), CoreDNS + traefik + metrics-server + local-path-provisioner Running, app MEAN + MongoDB pod Running.
+- [x] **ZAP DAST** — image `ghcr.io/zaproxy/zaproxy:stable` disponible, scan baseline exécuté contre l'app via le réseau k3d : **FAIL-NEW: 0 / PASS: 58 / WARN-NEW: 3** → `pipeline/out/zap-report.html/json/xml`.
 
 ```bash
-echo '{"dns":["8.8.8.8","8.8.4.4"]}' | sudo tee /etc/docker/daemon.json
-sudo systemctl restart docker
+# Redeployer le cluster (si besoin)
+k3d cluster create devsecops \
+  --port 80:80@loadbalancer --port 443:443@loadbalancer --port 8081:30081@loadbalancer
+kubectl apply -k k8s/overlays/dev
+
+# Scan DAST (ZAP baseline) — via le réseau k3d pour joindre la nodePort Traefik
+docker run --rm --network k3d-devsecops \
+  -v "$PWD/pipeline/out:/zap/wrk/:rw" ghcr.io/zaproxy/zaproxy:stable \
+  zap-baseline.py -t "http://172.18.0.3:32614/" -r zap-report.html -J zap-report.json -x zap-report.xml -I
 ```
 
 ### Optionnel
