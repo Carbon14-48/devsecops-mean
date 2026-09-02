@@ -33,7 +33,7 @@ Pipeline DevSecOps complet avec **moteur de décision IA** sur une application *
 │                     PIPELINE Jenkinsfile                         │
 │                                                                  │
 │  1. HMAC verification                                            │
-│  2. Provision outils (SemGrep, Gitleaks)                         │
+│  2. Provision outils (SemGrep, Gitleaks) + noise-filter tests        │
 │  3. Scans parallèles (3 × resilient retry 3×)                   │
 │     ├── SemGrep (SAST)  ─── SARIF → pivot                       │
 │     ├── Trivy (SCA)     ─── JSON  → pivot                       │
@@ -93,8 +93,11 @@ devsecops-mean/
 │   │   ├── src/
 │   │   │   ├── engine.js       Logique de scoring (décision + explication)
 │   │   │   └── index.js        CLI wrapper
-│   │   └── config/
+ │   │   └── config/
 │   │       └── weights.json    Pondérations (severity × category)
+│   │   └── test/
+│   │       ├── run.sh          Lance les tests noise-filter (12 assertions)
+│   │       └── noise-filter-test.js  Tests dedup / confidence / ignoredRules
 │   ├── ai/
 │   │   ├── llm.js             Appel LLM Groq (fetch natif, fallback déterministe)
 │   │   ├── report.js          Rapport exécutif (déterministe + section IA)
@@ -230,8 +233,41 @@ Score = Σ (sévérité × catégorie)
 
 > Voir [ADR-0002](docs/ADR/ADR-0002-score-aggregation.md) pour la justification de la séparation Phase 1/Phase 2.
 
-**Historique du score** :
+ **Historique du score** :
 - V0 : 18 → V1 : 88 → V3 : 231 → **Fix drift : 217 (stable)**
+
+---
+
+## Filtrage du bruit / déduplication
+
+Le scoring inclut un filtre de bruit (`pipeline/score/src/engine.js` → `filterNoise()`) qui supprime les **doublons** (même `id`) et les findings à **confiance faible** ou **règles ignorées**.
+
+**Contrat d'id** : `hashId([tool, ruleId, file, line])`. Deux findings d'outils différents sur la même ligne ont des ids **distincts** → chacun est compté (c'est un choix de conception, pas un bug). Un doublon *vrai* partage exactement le même id.
+
+### Tests unitaires — preuve directe
+
+`pipeline/score/test/run.sh` → **12/12 assertions passantes** :
+
+```
+Test 1: Dedup by id         → bruts: 3 → filtrés: 2  (même id, gardé le plus sévère)
+Test 2: Confidence          → bruts: 3 → filtrés: 1  (confidence < 0.5 supprimé)
+Test 3: ignoredRules        → bruts: 3 → filtrés: 1  (règle ignorée supprimée)
+Test 4: Combined scenario   → bruts: 5 → filtrés: 2  (déduction + confiance + ignoredRules)
+Test 5: decide() full run   → raw: 3 → filtered: 1   (bruit complet)
+```
+
+Ces tests tournnent à chaque build Jenkins (Stage 2 "Provision outils").
+
+### Preuve E2E — pivot réel + doublon injecté
+
+On prend le pivot du run de référence (`20260901-165026`, 30 findings, 217 pts), on injecte un **doublon** (même id, sévérité inférieure), et on relance le scoring :
+
+```
+Findings bruts : 31  →  après filtrage bruit/dédup : 30
+DÉCISION : BLOCK (score inchangé = 217 / seuil 10)
+```
+
+→ le doublon est **supprimé**, le score original **217** est préservé. Artefacts : `~/devsecops-runs/dedup-proof-20260902-120826/` (decision.log + decision.json + pivot-injected.json).
 
 ---
 
@@ -243,9 +279,10 @@ Stage 1: HMAC verification
   ├── Preuve HMAC-SHA256 calculée sur payload test
   └── Limitation smee documentée (relay strip signature)
 
-Stage 2: Provision outils
+ Stage 2: Provision outils
   ├── SemGrep: pip install dans venv
-  └── Gitleaks: curl + tar (si absent)
+  ├── Gitleaks: curl + tar (si absent)
+  └── Noise filter tests: pipeline/score/test/run.sh (12 assertions: dedup + confidence + ignoredRules)
 
 Stage 3: Scans parallèles (3 × retry avec fallback vide)
   ├── 3a. Scan SAST (SemGrep)

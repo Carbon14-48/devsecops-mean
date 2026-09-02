@@ -64,6 +64,9 @@ pipeline {
             chmod +x "$GITLEAKS"
           fi
           "$GITLEAKS" version
+          # Noise filter unit tests (dedup / confidence / ignoredRules)
+          echo "=== Noise filter tests ==="
+          bash pipeline/score/test/run.sh
         '''
       }
     }
