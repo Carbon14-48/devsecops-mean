@@ -2,7 +2,7 @@
 
 Pipeline DevSecOps complet avec **moteur de décision IA** sur une application **MEAN** (MongoDB, Express, Angular, Node.js) volontairement vulnérable.
 
-**V0-V3 terminé et démontré.** V3 : cluster k3d `devsecops` sain (pods Running), app MEAN déployée via manifests K8s, Argo CD installé et opérationnel (UI + login admin + Application `devsecops-mean` Healthy), scan DAST OWASP ZAP exécuté (0 FAIL). Limite environnementale documentée : pas d'égresse réseau depuis le réseau pod → synchro Git live d'Argo CD indisponible (images importées hors-ligne via containerd), scan ZAP exécuté via le réseau k3d. Score stable de référence : **217/10** (BLOCK, seuil 10). E2E final : **v0→BLOCK 217/30** (rouge), **v0-pass→PASS 0/0** (vert).
+**V0-V3 terminé et démontré.** V3 : cluster k3d `devsecops` sain (pods Running), app MEAN déployée via manifests K8s, Argo CD installé et opérationnel (UI + login admin + Application `devsecops-mean` Healthy), scan DAST OWASP ZAP exécuté (0 FAIL). Limite environnementale documentée : pas d'égresse réseau depuis le réseau pod → synchro Git live d'Argo CD indisponible (images importées hors-ligne via containerd), scan ZAP exécuté via le réseau k3d. Score stable de référence : **Phase 1 (V0-V2) = 74 pts + Phase 2 (V3) = +143 pts = 217/10** (BLOCK, seuil 10). E2E final : **v0→BLOCK 217/30** (rouge), **v0-pass→PASS 0/0** (vert).
 
 ---
 
@@ -12,8 +12,10 @@ Pipeline DevSecOps complet avec **moteur de décision IA** sur une application *
 |---------|----------|--------|-------|--------|
 | **V0** | Chaîne minimale (1 module, 1 outil) | SemGrep | 18/10 | ✅ TERMINÉ & DÉMONTRÉ |
 | **V1** | 3 outils en parallèle + scoring | SemGrep + Trivy + Gitleaks | 88/10 | ✅ TERMINÉ & DÉMONTRÉ |
-| **V2** | Dashboard, rapport IA, webhooks, archival | + Express API + Groq LLM + notify + HMAC + Jenkins Credentials | 217/10 | ✅ TERMINÉ & DÉMONTRÉ |
-| **V3** | K8s + DAST + composition + rollback | + kube-score + ZAP + composition + Argo CD | 217/10 | ✅ TERMINÉ & DÉMONTRÉ |
+| **V2** | Dashboard, rapport IA, webhooks, archival | + Express API + Groq LLM + notify + HMAC + Jenkins Credentials | 74/10 | ✅ TERMINÉ & DÉMONTRÉ |
+| **V3** | K8s + DAST + composition + rollback | + kube-score + ZAP + composition + Argo CD | 217/10 (dont +143 Phase 2) | ✅ TERMINÉ & DÉMONTRÉ |
+
+> **Note sur le score** : V0/V1 = scores historiques, mesurés avant la séparation Phase 1/Phase 2 ([ADR-0002](docs/ADR/ADR-0002-score-aggregation.md)). Référence stable actuelle : **Phase 1 (V0-V2) = 74 pts** (SemGrep 18 + Trivy 28 + Gitleaks 28), **Phase 2 (V3) = +143 pts** (kube-score 99 + composition 44), total = **217 pts sur un seuil de 10**. La ligne V2 = 74 correspond au cœur V0-V2 seul.
 
 ---
 
@@ -94,7 +96,7 @@ devsecops-mean/
 │   │   └── config/
 │   │       └── weights.json    Pondérations (severity × category)
 │   ├── ai/
-│   │   ├── llm.js             Appel LLM Gemini (fetch natif, fallback déterministe)
+│   │   ├── llm.js             Appel LLM Groq (fetch natif, fallback déterministe)
 │   │   ├── report.js          Rapport exécutif (déterministe + section IA)
 │   │   └── composition.js     Analyse d'architecture / surface d'attaque
 │   ├── scripts/
@@ -157,8 +159,8 @@ devsecops-mean/
 | VULN-002b | Mot de passe en dur (`admin123`) | `app/server/src/config.js:15` | Gitleaks | 14 pts |
 | VULN-003 | `lodash@4.17.15` avec 5 CVEs | `app/server/package-lock.json` | Trivy SCA | 28 pts |
 | VULN-K8s | Secret Kubernetes en dur | `k8s/base/app-deployment.yaml:62` | Gitleaks | 14 pts |
-| VULN-K8s-CONFIG | 15 findings kube-score | `k8s/base/*.yaml` | kube-score | 7 pts |
-| VULN-COMP | 6 findings composition | `app/server/src/config.js` | composition.js | 20 pts |
+| VULN-K8s-CONFIG | 15 findings kube-score | `k8s/base/*.yaml` | kube-score | 99 pts |
+| VULN-COMP | 6 findings composition | `app/server/src/config.js` | composition.js | 44 pts |
 
 ---
 
@@ -211,7 +213,7 @@ Score = Σ (sévérité × catégorie)
 
 | Composant | Findings | Score |
 |-----------|----------|-------|
-| SemGrep (SAST) | 3 | 14 pts |
+| SemGrep (SAST) | 3 | 18 pts |
 | Trivy (SCA) | 4 | 28 pts |
 | Gitleaks (Secrets) | 2 | 28 pts |
 | **Phase 1 total** | **9** | **74 pts** |
@@ -220,8 +222,8 @@ Score = Σ (sévérité × catégorie)
 
 | Composant | Findings | Score |
 |-----------|----------|-------|
-| kube-score (K8s) | 15 | 7 pts |
-| Composition | 6 | 136 pts |
+| kube-score (K8s) | 15 | 99 pts |
+| Composition | 6 | 44 pts |
 | **Phase 2 total** | **21** | **+143 pts** |
 
 **Total (Phase 1 + Phase 2) : 30 findings → 217 pts**
@@ -249,9 +251,14 @@ Stage 3: Scans parallèles (3 × retry avec fallback vide)
   ├── 3a. Scan SAST (SemGrep)
   │   └── semgrep --config auto --sarif → semgrep.sarif
   ├── 3b. Scan SCA (Trivy)
-  │   └── trivy fs --format json --scanners vuln → trivy.json
+  │   └── trivy fs --skip-db-update --format json --severity HIGH,CRITICAL → trivy.json
   └── 3c. Scan Secrets (Gitleaks)
       └── gitleaks detect --config .gitleaks.toml --no-git → gitleaks.json
+
+Secrets chargés depuis Jenkins Credentials (stage global "environment") :
+  ├── GROQ_API_KEY   = credentials('groq-api-key')       → rapport IA (Groq)
+  ├── SLACK_WEBHOOK_URL = credentials('slack-webhook-url') → notify.sh
+  └── HMAC_SECRET    = credentials('github-webhook-secret') → vérification HMAC
 
 Stage 4: Normalisation + Merge
   ├── Chaque outil → format pivot (JSON normalisé)
@@ -458,7 +465,7 @@ docker run -d --name mean-app \
 # 3. Scanner
 cd /home/carbon14/devsecops-mean
 ~/devsecops-tools/semgrep-venv/bin/semgrep --config auto --sarif app/server/src/ > /tmp/semgrep.sarif
-trivy fs --format json --scanners vuln app/server/ > /tmp/trivy.json
+trivy fs --skip-db-update --format json --severity HIGH,CRITICAL app/server/ > /tmp/trivy.json
 ~/devsecops-tools/gitleaks detect --config .gitleaks.toml --no-git -s . --report-format json --report-path - > /tmp/gl.json
 
 # 4. Normaliser + Merge + Score
@@ -503,7 +510,11 @@ SCAN_ROOT=test/fixtures/clean-app
 
 - WAR : `~/jenkins/jenkins.war`
 - HOME : `~/.jenkins/`
-- Credentials : `github-webhook-secret` (GLOBAL, plaintext)
+- Credentials (Jenkins Credentials Binding, tous en "Secret text", stock système) :
+  - `groq-api-key` → clé API Groq (rapport IA)
+  - `github-webhook-secret` → secret HMAC webhook GitHub (GLOBAL, plaintext)
+  - `slack-webhook-url` → webhook Slack (notifications)
+- Chargés dans le pipeline : `environment { GROQ_API_KEY = credentials('groq-api-key'); SLACK_WEBHOOK_URL = credentials('slack-webhook-url'); HMAC_SECRET = credentials('github-webhook-secret') }`
 - Webhook HMAC : `$HOME/.jenkins/secrets/webhook-hmac-secret`
 
 ---
