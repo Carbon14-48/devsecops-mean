@@ -96,13 +96,13 @@ curl -H "Host: devsecops.local" http://localhost/health
 ### Commande
 ```bash
 # Ouvrir http://localhost:8080
-# Aller dans devsecops-v0 → Build #36 → Console
+# Aller dans devsecops-v0 → Build #37 → Console
 # Montrer : "PORTE DE DÉCISION : BLOCK — build rouge"
 # Montrer : "Decision: BLOCK | Score: 217 | Findings: 30"
 ```
 
 ### Attendu
-- Build #36 **FAILURE** (rouge)
+- Build #37 **FAILURE** (rouge)
 - `DÉCISION : BLOCK (score cumulé non plafonné 217 / seuil 10)`
 - `Findings bruts : 30 → après filtrage bruit/dédup : 30`
 - Top findings : secrets (20 pts CRITICAL), gitleaks AWS (14 pts), semgrep (7 pts × 3), trivy lodash (7 pts × 4), kube-score (7 pts × 1)
@@ -118,7 +118,7 @@ curl -H "Host: devsecops.local" http://localhost/health
 
 ### Commande
 ```bash
-# Aller dans devsecops-v0-pass → Build #27/#28 → Console
+# Aller dans devsecops-v0-pass → Build #29 → Console
 # Montrer : "PORTE DE DÉCISION : PASS — build vert"
 # Montrer : "Decision: PASS | Score: 0 | Findings: 0"
 # Descendre jusqu'à : "Noise filter tests" → "Results: 12 passed, 0 failed"
@@ -238,8 +238,8 @@ git log --oneline | head -15
 | 1 | K8s pods (tous Running) | `kubectl get pods -A` |
 | 2 | App health | `curl -H "Host: devsecops.local" http://localhost/health` |
 | 3 | Argo CD UI (apps Healthy) | `https://localhost:9090` |
-| 4 | Jenkins v0 (BLOCK 217) | Console `devsecops-v0` #36 |
-| 5 | Jenkins v0-pass (PASS 0) | Console `devsecops-v0-pass` #27 + noise tests |
+| 4 | Jenkins v0 (BLOCK 217) | Console `devsecops-v0` #37 |
+| 5 | Jenkins v0-pass (PASS 0) | Console `devsecops-v0-pass` #29 + noise tests |
 | 6 | Dashboard (cards) | `http://localhost:3200` |
 | 7 | Rapport exécutif (Groq) | `~/devsecops-runs/20260901-165026/report.txt` |
 | 8 | ZAP report (0 FAIL) | `pipeline/out/zap-report.html` |

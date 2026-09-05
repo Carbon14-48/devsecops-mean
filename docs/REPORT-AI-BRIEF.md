@@ -115,8 +115,8 @@ environment {
 - `devsecops-v0-pass` — `SCAN_ROOT` par défaut `test/fixtures/clean-app` → **PASS** (vert).
 
 **E2E final (preuves) :**
-- `devsecops-v0` **#36** → `FAILURE` — `Decision: BLOCK | Score: 217 | Findings: 30`, ligne console `PORTE DE DÉCISION : BLOCK — build rouge`, Slack notifié.
-- `devsecops-v0-pass` **#27/#28** → `SUCCESS` — `Decision: PASS | Score: 0 | Findings: 0`, ligne `PORTE DE DÉCISION : PASS — build vert`, noise-filter tests `Results: 12 passed, 0 failed`.
+- `devsecops-v0` **#37** → `FAILURE` — `Decision: BLOCK | Score: 217 | Findings: 30`, ligne console `PORTE DE DÉCISION : BLOCK — build rouge`, Slack notifié.
+- `devsecops-v0-pass` **#29** → `SUCCESS` — `Decision: PASS | Score: 0 | Findings: 0`, ligne `PORTE DE DÉCISION : PASS — build vert`, noise-filter tests `Results: 12 passed, 0 failed`.
 
 **Credentials Jenkins (vérifiés via API, store système, "Secret text")** : `groq-api-key`, `github-webhook-secret`, `slack-webhook-url`. (Groq : la console montre `[report] calling LLM (Groq)… [report] LLM summary appended`.)
 
@@ -208,17 +208,17 @@ Le doublon est supprimé, le score original 217 est préservé. Artefacts : `~/d
 
 > **Chaque capture est un fichier concret sur disque.** Pour le rapport, screenshot/image les fichiers listés ci-dessous. Le répertoire `docs/screenshots/` contient les preuves prêtes à capturer.
 
-| # | Sujet | Commande / Fichier | Preuve sur disque |
+| # | Sujet | Commande / Fichier | Preuve sur disque (PNG) |
 |---|-------|-------------------|-------------------|
-| 1 | K8s pods (tous Running) | `kubectl get pods -A` | `docs/screenshots/01-k8s-pods.txt` |
-| 2 | App health | `curl -H "Host: devsecops.local" http://localhost/health` | `docs/screenshots/02-health.txt` |
-| 3 | Argo CD UI (apps Healthy) | `https://localhost:9090` → login `admin` / `4OKpXWRDqaW2oyH8` | `docs/screenshots/03-argocd.txt` (capture texte) |
-| 4 | Jenkins v0 (BLOCK 217) | Console `devsecops-v0` #36 | `docs/screenshots/04-jenkins-v0-BLOCK.txt` |
-| 5 | Jenkins v0-pass (PASS 0) + noise tests | Console `devsecops-v0-pass` #27/#28 | `docs/screenshots/05-jenkins-v0pass-PASS.txt` |
-| 6 | Dashboard (cards) | `http://localhost:3200` | `docs/screenshots/06-dashboard.txt` (ou screenshot image) |
-| 7 | Rapport exécutif **IA Groq** | `~/devsecops-runs/20260901-165026/report.txt` | `docs/screenshots/07-report-IA.txt` (section `RÉSUMÉ EXÉCUTIF (généré par IA — Groq Llama)`) |
-| 8 | ZAP report (0 FAIL / 58 PASS / 3 WARN) | `pipeline/out/zap-report.html` | `docs/screenshots/08-zap-report.html` (ouvrable dans navigateur) |
-| 9 | Dedup proof (31→30, score 217) | `~/devsecops-runs/dedup-proof-20260902-120826/decision.log` | `docs/screenshots/09-dedup-decision.log` |
+| 1 | Jenkins dashboard (v0 rouge, v0-pass vert) | `http://localhost:8080/` | `docs/report-screenshots/01-jenkins-dashboard-jobs.png` |
+| 2 | Jenkins v0 #37 console — BLOCK 217 + PORTE DE DÉCISION | Console `devsecops-v0` #37 | `docs/report-screenshots/02-jenkins-v0-console-BLOCK.png` |
+| 3 | Pipeline Stage View — scans parallèles + kube-score + composition + Decision 217 | `devsecops-v0` #37 pipeline | `docs/report-screenshots/03-jenkins-v0-pipeline-stage-view.png` |
+| 4 | Dashboard web (cards SAST/SCA/Secrets/K8s + score 217 + BLOCK) | `http://localhost:3200` | `docs/report-screenshots/04-dashboard-web-BLOCK-217.png` |
+| 5 | Rapport exécutif — déterministe + **IA Groq** | `~/devsecops-runs/20260827-224935/report.txt` | `docs/report-screenshots/05-report-executif-IA.png` |
+| 6 | Jenkins Credentials (groq-api-key, github-webhook-secret, slack-webhook-url) | `http://localhost:8080/manage/credentials/...` | `docs/report-screenshots/06-jenkins-credentials.png` |
+| 7 | `kubectl get pods -A` — tous Running | Terminal render | `docs/report-screenshots/07-kubectl-pods-all.png` |
+| 8 | Argo CD — app `devsecops-mean` **Healthy** | `https://localhost:9090/applications/devsecops-mean` | `docs/report-screenshots/08-argocd-app-healthy.png` |
+| 9 | OWASP ZAP — 0 FAIL / 58 PASS / 3 WARN | `pipeline/out/zap-report.html` | `docs/report-screenshots/09-zap-report-summary.png` |
 
 ---
 
@@ -232,7 +232,7 @@ Le rapport doit suivre ce plan. Le rédiger en **français**, ton professionnel,
 4. **État de l'art / outils** — SAST/SCA/Secrets/DAST/K8s/GitOps, périmètre des outils choisis (tableau §5).
 5. **Architecture du projet** — monorepo, pipeline 7 stages, dashboard, K8s/Argo CD (schémas textiles issus du README §Architecture globale).
 6. **Méthodologie V0 → V3** — une sous-section par version, ce qui a été ajouté et *pourquoi* (voir §2).
-7. **Mesures & résultats** — tables §3, §4 ; E2E `#36 BLOCK 217/30` vs `#26 PASS 0/0` ; stabilité 217 ; ZAP 0/58/3.
+7. **Mesures & résultats** — tables §3, §4 ; E2E `#37 BLOCK 217/30` vs `#29 PASS 0/0` ; stabilité 217 ; ZAP 0/58/3.
 8. **Réponses aux points du tuteur** — développer le §9 (séparation des scores, HMAC, credentials, bruit, Slack).
 9. **Limites & contraintes** — pas d'égrèsse réseau pod (Argo CD sync live, pulls images ; compensations), fallback IA, seuil arbitraire. Transparence = point fort.
 10. **Démo** — ordre + 9 captures (voir §11).

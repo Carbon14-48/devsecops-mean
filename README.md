@@ -578,8 +578,8 @@ Score **217** stable sur 3 builds consécutifs (#27, #28, #29, #30).
 
 - Ajout de `--skip-db-update` dans le Jenkinsfile (stage SCA) : avant ce fix, Trivy tentait de télécharger sa DB et **pendait** (fallback vide → fausse note PASS 0/0). Désormais Trivy scanne avec la DB locale et le verdict est **honnête**.
 - E2E final (jobs avec leur SCAN_ROOT par défaut) :
-  - `devsecops-v0` (#36, target `app/`) → **FAILURE / BLOCK / 217 pts / 30 findings** (rouge) ✅ attendu
-  - `devsecops-v0-pass` (#26, target `test/fixtures/clean-app`) → **SUCCESS / PASS / 0 pts / 0 finding** (vert) ✅ attendu
+  - `devsecops-v0` (#37, target `app/`) → **FAILURE / BLOCK / 217 pts / 30 findings** (rouge) ✅ attendu
+  - `devsecops-v0-pass` (#29, target `test/fixtures/clean-app`) → **SUCCESS / PASS / 0 pts / 0 finding** (vert) ✅ attendu
 
 ---
 
