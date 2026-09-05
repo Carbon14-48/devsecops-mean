@@ -1,0 +1,8 @@
+NAME                                                READY   STATUS    RESTARTS       AGE    IP           NODE                     NOMINATED NODE   READINESS GATES
+argocd-application-controller-0                     1/1     Running   0              4d3h   10.42.0.39   k3d-devsecops-server-0   <none>           <none>
+argocd-applicationset-controller-6cc6ff65b6-hj5zh   1/1     Running   0              4d3h   10.42.0.32   k3d-devsecops-server-0   <none>           <none>
+argocd-dex-server-569cc67f5f-xwrqq                  1/1     Running   0              4d3h   10.42.0.38   k3d-devsecops-server-0   <none>           <none>
+argocd-notifications-controller-7d9478f86-zmb5h     1/1     Running   0              4d3h   10.42.0.37   k3d-devsecops-server-0   <none>           <none>
+argocd-redis-54bd4f8bd6-g8njb                       1/1     Running   0              4d3h   10.42.0.34   k3d-devsecops-server-0   <none>           <none>
+argocd-repo-server-57667bbc7f-mj7bb                 1/1     Running   2 (4d3h ago)   4d3h   10.42.0.35   k3d-devsecops-server-0   <none>           <none>
+argocd-server-9d48fdd75-9m7wb                       1/1     Running   0              4d3h   10.42.0.36   k3d-devsecops-server-0   <none>           <none>

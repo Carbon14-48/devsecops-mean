@@ -1,0 +1,23 @@
+[
+  {
+    "id": "dedup-proof-20260902-120826",
+    "decision": "BLOCK",
+    "score": 217,
+    "threshold": 10,
+    "findings": 30
+  },
+  {
+    "id": "20260905-185857",
+    "decision": "PASS",
+    "score": 0,
+    "threshold": 10,
+    "findings": 0
+  },
+  {
+    "id": "20260902-122033",
+    "decision": "PASS",
+    "score": 0,
+    "threshold": 10,
+    "findings": 0
+  }
+]

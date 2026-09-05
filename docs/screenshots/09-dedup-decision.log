@@ -1,0 +1,34 @@
+================================================================
+  DÉCISION : BLOCK  (score cumulé non plafonné 217 / seuil 10)
+================================================================
+
+Findings bruts : 31  →  après filtrage bruit/dédup : 30
+
+Top findings pondérés (sévérité × catégorie) :
+
+  [20.0 pts] CRITICAL secrets  composition app/server/src/config.js:0
+      hardcoded-secrets-in-config — Configuration file contains hardcoded secrets
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:9
+      aws-access-key — Secret detected: AKIAIOSFODNN7EXAMPLE at line 9
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:15
+      generic-secret — Secret detected: Password: 'admin123' at line 15
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/config.js:9
+      pipeline.rules.hardcoded-aws-credential — Hardcoded credential (VULN-002): AWS access key in source code. Move to environment variable / secret manager.
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/routes/search.js:17
+      pipeline.rules.nosql-injection-where — NoSQL injection (VULN-001): user input interpolated into a `$where` operator. Use an escaped regex or text search, never $where.
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2020-8203 — lodash@4.17.15 is vulnerable: CVE-2020-8203 (fix: 4.17.19)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2021-23337 — lodash@4.17.15 is vulnerable: CVE-2021-23337 (fix: 4.17.21)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2026-4800 — lodash@4.17.15 is vulnerable: CVE-2026-4800 (fix: 4.18.0)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      NSWG-ECO-516 — lodash@4.17.15 is vulnerable: NSWG-ECO-516 (fix: >=4.17.19)
+  [7.0 pts] HIGH     k8s      kube-score devsecops-app/devsecops:0
+      container-security-context-user-group-id — Container Security Context User Group ID
+
+Pourquoi BLOCK : le score cumulé dépasse le seuil de blocage.
+→ Corriger les findings listés, ou recalibrer le seuil/les poids (pipeline/score/config/).
+
+Poids appliqués — sévérité : {"critical":10,"high":7,"medium":4,"low":1,"info":0.5}
+Poids appliqués — catégorie : {"sast":1,"sca":1,"secrets":2,"container":1.2,"k8s":1,"dast":1.5}

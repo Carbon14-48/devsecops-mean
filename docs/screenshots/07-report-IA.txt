@@ -1,0 +1,158 @@
+╔══════════════════════════════════════════════════════════════╗
+║          RAPPORT EXÉCUTIF SÉCURITÉ — DevSecOps              ║
+╚══════════════════════════════════════════════════════════════╝
+
+  Date : 2026-09-01T15:50:24.429Z
+  Décision : BLOCK
+  Score Phase 1 (V0-V2) : 74 pts  (9 findings)
+  Score Phase 2 (V3)    : +143 pts  (kube-score + composition)
+  Score total           : 217 / seuil 10
+  Findings bruts : 30  →  filtrés : 30
+
+─── RÉSUMÉ EXÉCUTIF ───────────────────────────────────────────
+
+  ⛔ LE BUILD EST BLOQUÉ.
+  30 finding(s) de sécurité dépassent le seuil de 10.
+  Des corrections sont nécessaires avant le déploiement.
+
+─── RÉPARTITION PAR SÉVÉRITÉ ─────────────────────────────────
+
+  CRITIQUE     1  █
+  HAUTE       23  ███████████████████████
+  MOYENNE      5  █████
+  BASSE        1  █
+
+─── RÉPARTITION PAR CATÉGORIE ────────────────────────────────
+
+  Kubernetes                      15 findings  (score: 7.0)
+  Analyse statique (SAST)          5 findings  (score: 14.0)
+  Dépendances (SCA)                5 findings  (score: 28.0)
+  Secrets exposés                  3 findings  (score: 48.0)
+  Conteneur                        2 findings  (score: 0.0)
+
+─── RÉPARTITION PAR OUTIL ────────────────────────────────────
+
+  kube-score    15 findings
+  composition    6 findings
+  trivy          4 findings
+  semgrep        3 findings
+  gitleaks       2 findings
+
+─── TOP FINDINGS (par score pondéré) ─────────────────────────
+
+  #1  [20.0 pts] CRITIQUE — composition — secrets
+      ID: composition-2-1788277823246
+      Règle: hardcoded-secrets-in-config
+      Fichier: app/server/src/config.js:0
+      Description: Configuration file contains hardcoded secrets
+
+  #2  [14.0 pts] HAUTE — gitleaks — secrets
+      ID: 916d2d21cb4e6501
+      Règle: aws-access-key
+      Fichier: app/server/src/config.js:9
+      Description: Secret detected: AKIAIOSFODNN7EXAMPLE at line 9
+      Action: Révoquer la clé exposée immédiatement, la rotation, migrer vers des rôles IAM ou des credentials temporaires.
+      Impact: CRITIQUE — accès direct à l'infrastructure AWS.
+      Réf: CWE-798
+
+  #3  [14.0 pts] HAUTE — gitleaks — secrets
+      ID: 4429e56e5d31f34f
+      Règle: generic-secret
+      Fichier: app/server/src/config.js:15
+      Description: Secret detected: Password: 'admin123' at line 15
+      Action: Révoquer le secret exposé, le rotation, utiliser un gestionnaire de secrets.
+      Impact: HAUTE — secret compromis dans le contrôle de version.
+      Réf: CWE-798
+
+  #4  [7.0 pts] HAUTE — semgrep — sast
+      ID: a0ea5b3cecc44439
+      Règle: pipeline.rules.hardcoded-aws-credential
+      Fichier: app/server/src/config.js:9
+      Description: Hardcoded credential (VULN-002): AWS access key in source code. Move to environment variable / secret manager.
+
+  #5  [7.0 pts] HAUTE — semgrep — sast
+      ID: 5b4e570f8e0fd138
+      Règle: pipeline.rules.nosql-injection-where
+      Fichier: app/server/src/routes/search.js:17
+      Description: NoSQL injection (VULN-001): user input interpolated into a `$where` operator. Use an escaped regex or text search, never $where.
+
+  #6  [7.0 pts] HAUTE — trivy — sca
+      ID: 7f66143a72e33789
+      Règle: CVE-2020-8203
+      Fichier: server/package-lock.json:0
+      Description: lodash@4.17.15 is vulnerable: CVE-2020-8203 (fix: 4.17.19)
+      Action: Mettre à jour lodash vers >= 4.17.21.
+      Impact: HAUTE — prototype pollution.
+      Réf: CWE-1321
+
+  #7  [7.0 pts] HAUTE — trivy — sca
+      ID: 3eb9a46b080fdb14
+      Règle: CVE-2021-23337
+      Fichier: server/package-lock.json:0
+      Description: lodash@4.17.15 is vulnerable: CVE-2021-23337 (fix: 4.17.21)
+      Action: Mettre à jour lodash vers >= 4.17.21.
+      Impact: HAUTE — command injection via template.
+      Réf: CWE-78
+
+  #8  [7.0 pts] HAUTE — trivy — sca
+      ID: eff96f578a683a4f
+      Règle: CVE-2026-4800
+      Fichier: server/package-lock.json:0
+      Description: lodash@4.17.15 is vulnerable: CVE-2026-4800 (fix: 4.18.0)
+      Action: Mettre à jour la dépendance concernée vers une version corrigée.
+      Impact: HAUTE — CVE identifié par Trivy SCA.
+
+  #9  [7.0 pts] HAUTE — trivy — sca
+      ID: 787017f9f9223245
+      Règle: NSWG-ECO-516
+      Fichier: server/package-lock.json:0
+      Description: lodash@4.17.15 is vulnerable: NSWG-ECO-516 (fix: >=4.17.19)
+      Action: Vulnérabilité documentée dans la base NodeSecurity. Mettre à jour le package affecté.
+      Impact: HAUTE — advisory de sécurité Node.js.
+
+  #10  [7.0 pts] HAUTE — kube-score — k8s
+      ID: kube-score-0-1788277823385
+      Règle: container-security-context-user-group-id
+      Fichier: devsecops-app/devsecops:0
+      Description: Container Security Context User Group ID
+
+─── PLAN D'ACTION RECOMMANDÉ ──────────────────────────────────
+
+  1. SÉCURITÉ IMMÉDIATE (secrets exposés) :
+     → Révoquer toutes les clés AWS exposées.
+     → Activer AWS IAM Access Analyzer.
+     → 3 secret(s) à traiter en priorité.
+
+  2. MISES À JOUR DÉPENDANCES :
+     → Mettre à jour lodash >= 4.17.21 (CVE-2020-8203, CVE-2021-23337).
+     → 5 vulnérabilité(s) SCA à corriger.
+
+  3. CORRECTIONS CODE (SAST) :
+     → Supprimer les credentials en dur dans le code.
+     → Ajouter la validation des entrées pour les requêtes MongoDB.
+     → 5 finding(s) SAST à corriger.
+
+─── MÉTHODOLOGIE ─────────────────────────────────────────────
+
+  Outils : SemGrep (SAST), Trivy (SCA), Gitleaks (secrets)
+  Scoring : sévérité × catégorie pondérée (seuil: 10)
+  Gate : déterministe — le rapport IA ne modifie pas la décision.
+
+══════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════
+=== RÉSUMÉ EXÉCUTIF (généré par IA — Groq Llama) ===
+══════════════════════════════════════════════════════════════
+
+  Le pipeline a été bloqué avec un score total de 217, largement au-dessus du seuil de blocage de 10. Les principales vulnérabilités proviennent de secrets codés en dur (incluant une clé d'accès AWS) et d'une injection NoSQL, ainsi que de dépendances Node.js vulnérables (lodash).
+
+  Risques prioritaires :
+    → Secrets codés en dur dans config.js (critical) – clé AWS et mot de passe admin
+    → Injection NoSQL dans routes/search.js (high) – utilisation du $where avec entrée utilisateur
+    → Vulnérabilités multiples de lodash@4.17.15 (high) – CVE-2020-8203, CVE-2021-23337, CVE-2026-4800, etc.
+
+  Recommandations :
+    1. Supprimer tous les secrets du code source, les stocker dans un gestionnaire de secrets et régénérer les clés exposées.
+    2. Corriger l’injection NoSQL en remplaçant $where par des requêtes paramétrées ou des expressions régulières échappées.
+    3. Mettre à jour lodash vers la version 4.18.0 ou supérieure et vérifier les autres dépendances pour des correctifs similaires.
+
+══════════════════════════════════════════════════════════════

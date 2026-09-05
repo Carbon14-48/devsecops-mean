@@ -1,0 +1,302 @@
+Started by user unknown or anonymous
+Obtained pipeline/Jenkinsfile from git https://github.com/Carbon14-48/devsecops-mean.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /home/carbon14/.jenkins/workspace/devsecops-v0-pass
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+No credentials specified
+ > git rev-parse --resolve-git-dir /home/carbon14/.jenkins/workspace/devsecops-v0-pass/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/Carbon14-48/devsecops-mean.git # timeout=10
+Fetching upstream changes from https://github.com/Carbon14-48/devsecops-mean.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.55.0'
+ > git fetch --tags --force --progress -- https://github.com/Carbon14-48/devsecops-mean.git +refs/heads/main:refs/remotes/origin/main # timeout=10
+ > git rev-parse refs/remotes/origin/main^{commit} # timeout=10
+Checking out Revision 7c345958090ad380690687b4e5d3c1f77dd585dd (refs/remotes/origin/main)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 7c345958090ad380690687b4e5d3c1f77dd585dd # timeout=10
+Commit message: "feat: noise-filter proof — 12 unit tests wired into CI, 31→30 live dedup proof, README section"
+ > git rev-list --no-walk 14935b08ae681946ce06d90b7b29b1d5503d452a # timeout=10
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] withCredentials
+Masking supported pattern matches of $GROQ_API_KEY or $HMAC_SECRET or $SLACK_WEBHOOK_URL
+[Pipeline] {
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 15 min
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (HMAC verification)
+[Pipeline] sh
++ set -eu
++ '[' -n **** ']'
++ echo '[hmac] secret loaded from Jenkins Credentials (github-webhook-secret)'
+[hmac] secret loaded from Jenkins Credentials (github-webhook-secret)
++ echo '[hmac] secret length: 64 bytes'
+[hmac] secret length: 64 bytes
++ echo '[hmac] HMAC verification: delegated to Jenkins GitHub plugin (X-Hub-Signature-256)'
+[hmac] HMAC verification: delegated to Jenkins GitHub plugin (X-Hub-Signature-256)
++ PAYLOAD='{"zen":"test"}'
+++ echo -n '{"zen":"test"}'
+++ openssl dgst -sha256 -hmac ****
+++ awk '{print $2}'
++ SIG=sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34
++ echo '[hmac] proof: HMAC-SHA256 of test payload = sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34'
+[hmac] proof: HMAC-SHA256 of test payload = sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34
++ echo '[hmac] limitation: smee relay strips X-Hub-Signature-256; direct trigger path verified'
+[hmac] limitation: smee relay strips X-Hub-Signature-256; direct trigger path verified
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Provision outils)
+[Pipeline] sh
++ set -eu
++ mkdir -p /home/carbon14/devsecops-tools
++ '[' '!' -x /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep ']'
++ /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep --version
+
+A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+1.172.0
++ '[' '!' -x /home/carbon14/devsecops-tools/gitleaks ']'
++ /home/carbon14/devsecops-tools/gitleaks version
+8.30.1
++ echo '=== Noise filter tests ==='
+=== Noise filter tests ===
++ bash pipeline/score/test/run.sh
+=== Noise Filter Tests ===
+Test 1: Deduplication by id
+  ✅ bruts: 3 → filtrés: 2 (dedup keeps lower-severity)
+  ✅ kept the critical (lower = more severe)
+  ✅ unique finding preserved
+Test 2: Confidence filtering
+  ✅ bruts: 3 → filtrés: 1 (confidence < 0.5 dropped)
+  ✅ only the high-confidence finding kept
+Test 3: ignoredRules filtering
+  ✅ bruts: 3 → filtrés: 1 (noisy-rule ignored)
+  ✅ only the important-rule finding kept
+Test 4: Combined scenario (dedup + confidence + ignoredRules)
+  ✅ bruts: 5 → filtrés: 2 (dedup + confidence + ignoredRules)
+  ✅ A: dedup kept critical
+  ✅ D: genuine finding preserved
+Test 5: Full decide() with noise
+  ✅ raw: 3
+  ✅ filtered: 2 dropped (1 dedup + 1 low-confidence)
+
+Results: 12 passed, 0 failed
+=== Done ===
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Scans parallèles)
+[Pipeline] parallel
+[Pipeline] { (Branch: 1. Scan SAST (SemGrep))
+[Pipeline] { (Branch: 2. Scan SCA (Trivy))
+[Pipeline] { (Branch: 3. Scan Secrets (Gitleaks))
+[Pipeline] stage
+[Pipeline] { (1. Scan SAST (SemGrep))
+[Pipeline] stage
+[Pipeline] { (2. Scan SCA (Trivy))
+[Pipeline] stage
+[Pipeline] { (3. Scan Secrets (Gitleaks))
+[Pipeline] sh
+[Pipeline] sh
+[Pipeline] sh
++ set +e
++ SEMGREP=/home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep scan --config pipeline/rules/semgrep.yml --sarif -o pipeline/out/semgrep.sarif test/fixtures/clean-app
++ set +e
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ trivy fs --skip-db-update --format json --severity HIGH,CRITICAL test/fixtures/clean-app
++ break
++ '[' '!' -f pipeline/out/trivy.json ']'
++ '[' '!' -s pipeline/out/trivy.json ']'
+++ '[' -s pipeline/out/trivy.json ']'
+++ echo ok
++ echo '[scanner] trivy: ok'
+[scanner] trivy: ok
+[Pipeline] }
++ set +e
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ /home/carbon14/devsecops-tools/gitleaks detect --config .gitleaks.toml --no-git -s test/fixtures/clean-app --report-format json --report-path pipeline/out/gitleaks.json -v
+[Pipeline] // stage
+[Pipeline] }
++ break
++ '[' '!' -f pipeline/out/gitleaks.json ']'
++ '[' '!' -s pipeline/out/gitleaks.json ']'
+++ '[' -s pipeline/out/gitleaks.json ']'
+++ echo ok
++ echo '[scanner] gitleaks: ok'
+[scanner] gitleaks: ok
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
++ break
++ '[' '!' -f pipeline/out/semgrep.sarif ']'
++ '[' '!' -s pipeline/out/semgrep.sarif ']'
+++ '[' -s pipeline/out/semgrep.sarif ']'
+++ echo ok
++ echo '[scanner] semgrep: ok'
+[scanner] semgrep: ok
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // parallel
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (4. Normalisation + Merge)
+[Pipeline] sh
++ set +e
++ node pipeline/normalize/src/index.js --sarif pipeline/out/semgrep.sarif --tool semgrep --out pipeline/out/pivot-semgrep.json
+[normalize] 0 finding(s) → pivot (semgrep)
+[normalize] écrit dans pipeline/out/pivot-semgrep.json
++ node pipeline/normalize/src/index.js --json pipeline/out/trivy.json --tool trivy --out pipeline/out/pivot-trivy.json
+[normalize] 0 finding(s) → pivot (trivy)
+[normalize] écrit dans pipeline/out/pivot-trivy.json
++ node pipeline/normalize/src/index.js --json pipeline/out/gitleaks.json --tool gitleaks --out pipeline/out/pivot-gitleaks.json
+[normalize] 0 finding(s) → pivot (gitleaks)
+[normalize] écrit dans pipeline/out/pivot-gitleaks.json
++ node pipeline/normalize/src/index.js --merge pipeline/out/pivot-semgrep.json pipeline/out/pivot-trivy.json pipeline/out/pivot-gitleaks.json --out pipeline/out/pivot-phase1.json
+[normalize] 0 finding(s) mergés → pipeline/out/pivot-phase1.json
+++ node -e 'const p=JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/pivot-phase1.json'\'','\''utf8'\'')); console.log(p.findings.length)'
++ echo '[phase1] 0 finding(s) → Phase 1 pivot'
+[phase1] 0 finding(s) → Phase 1 pivot
++ '[' test/fixtures/clean-app = app ']'
++ echo '[scan] SCAN_ROOT=test/fixtures/clean-app — skipping K8s audit and composition'
+[scan] SCAN_ROOT=test/fixtures/clean-app — skipping K8s audit and composition
++ cp pipeline/out/pivot-phase1.json pipeline/out/pivot.json
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (5. Scoring + porte de décision)
+[Pipeline] sh
++ set -eu
++ node pipeline/score/src/index.js pipeline/out/pivot-phase1.json --out pipeline/out/decision-phase1.json
+================================================================
+  DÉCISION : PASS  (score cumulé non plafonné 0 / seuil 10)
+================================================================
+
+Aucun finding émis par les outils de scan.
+
+Pourquoi PASS : le score cumulé reste sous le seuil de blocage.
+
+Poids appliqués — sévérité : {"critical":10,"high":7,"medium":4,"low":1,"info":0.5}
+Poids appliqués — catégorie : {"sast":1,"sca":1,"secrets":2,"container":1.2,"k8s":1,"dast":1.5}
+[score] décision structurée → pipeline/out/decision-phase1.json
+[score] log explicatif      → pipeline/out/decision-phase1.log
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision-phase1.json'\'','\''utf8'\'')).totalScore)'
++ P1_SCORE=0
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision-phase1.json'\'','\''utf8'\'')).filteredFindings)'
++ P1_FINDINGS=0
++ echo 'Phase 1 (V0-V2): score=0 findings=0'
+Phase 1 (V0-V2): score=0 findings=0
++ node pipeline/score/src/index.js pipeline/out/pivot.json --out pipeline/out/decision.json
+================================================================
+  DÉCISION : PASS  (score cumulé non plafonné 0 / seuil 10)
+================================================================
+
+Aucun finding émis par les outils de scan.
+
+Pourquoi PASS : le score cumulé reste sous le seuil de blocage.
+
+Poids appliqués — sévérité : {"critical":10,"high":7,"medium":4,"low":1,"info":0.5}
+Poids appliqués — catégorie : {"sast":1,"sca":1,"secrets":2,"container":1.2,"k8s":1,"dast":1.5}
+[score] décision structurée → pipeline/out/decision.json
+[score] log explicatif      → pipeline/out/decision.log
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).totalScore)'
++ TOTAL_SCORE=0
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).filteredFindings)'
++ TOTAL_FINDINGS=0
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).decision)'
++ DECISION=PASS
++ node -e $'\n            const fs=require(\'fs\');\n            const d=JSON.parse(fs.readFileSync(\'pipeline/out/decision.json\',\'utf8\'));\n            const p1=JSON.parse(fs.readFileSync(\'pipeline/out/decision-phase1.json\',\'utf8\'));\n            d.phase1={score:p1.totalScore,findings:p1.filteredFindings,rawFindings:p1.rawFindings};\n            d.phase2Contribution=d.totalScore-p1.totalScore;\n            fs.writeFileSync(\'pipeline/out/decision.json\',JSON.stringify(d,null,2));\n          '
++ echo 'Total (Phase 1+2): score=0 findings=0 decision=PASS'
+Total (Phase 1+2): score=0 findings=0 decision=PASS
++ echo 'Phase 2 contribution: +0 pts'
+Phase 2 contribution: +0 pts
++ '[' PASS = BLOCK ']'
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (6. Rapport exécutif)
+[Pipeline] sh
++ set +e
++ node pipeline/ai/report.js pipeline/out/pivot.json pipeline/out/decision.json pipeline/out/report.txt
+[report] deterministic report built
+[report] calling LLM (Groq)...
+[report] LLM summary appended
+[report] written to pipeline/out/report.txt
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions)
+[Pipeline] echo
+=== ARCHIVES DU RUN (pivots, décision, log) ===
+[Pipeline] archiveArtifacts
+Archiving artifacts
+[Pipeline] sh
++ set +e
++ bash pipeline/scripts/save-run.sh pipeline/out
+[run-saved] /home/carbon14/devsecops-runs/20260902-122033
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).decision)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).totalScore)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).blockThreshold)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).filteredFindings)'
+[Pipeline] echo
+Decision: PASS | Score: 0 | Findings: 0
+[Pipeline] sh
+Warning: A secret was passed to "sh" using Groovy String interpolation, which is insecure.
+		 Affected argument(s) used the following variable(s): [SLACK_WEBHOOK_URL]
+		 See https://jenkins.io/redirect/groovy-string-interpolation for details.
++ SLACK_WEBHOOK_URL=****
++ bash pipeline/scripts/notify.sh PASS 0 10 0 pipeline/out/report.txt
+=== NOTIFICATION ===
+  Decision: PASS
+  Score: 0 / 10
+  Findings: 0
+
+[notify] Slack: sent (PASS)
+[notify] NOTIFY_EMAIL not set, skipping email
+[notify] logged to /home/carbon14/devsecops-runs/notifications.log
+=== END NOTIFICATION ===
+[Pipeline] sh
++ bash pipeline/scripts/rollback.sh pipeline/out/decision.json devsecops devsecops-app
+[rollback] kubectl not found, skipping rollback check
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] echo
+=== PORTE DE DÉCISION : PASS — build vert ===
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // withCredentials
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS

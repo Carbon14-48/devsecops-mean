@@ -1,0 +1,401 @@
+Started by user unknown or anonymous
+Obtained pipeline/Jenkinsfile from git https://github.com/Carbon14-48/devsecops-mean.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /home/carbon14/.jenkins/workspace/devsecops-v0
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+No credentials specified
+ > git rev-parse --resolve-git-dir /home/carbon14/.jenkins/workspace/devsecops-v0/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/Carbon14-48/devsecops-mean.git # timeout=10
+Fetching upstream changes from https://github.com/Carbon14-48/devsecops-mean.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.55.0'
+ > git fetch --tags --force --progress -- https://github.com/Carbon14-48/devsecops-mean.git +refs/heads/main:refs/remotes/origin/main # timeout=10
+ > git rev-parse refs/remotes/origin/main^{commit} # timeout=10
+Checking out Revision 14935b08ae681946ce06d90b7b29b1d5503d452a (refs/remotes/origin/main)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 14935b08ae681946ce06d90b7b29b1d5503d452a # timeout=10
+Commit message: "fix: trivy --skip-db-update in Jenkinsfile to avoid hanging on DB download"
+ > git rev-list --no-walk 14935b08ae681946ce06d90b7b29b1d5503d452a # timeout=10
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] withCredentials
+Masking supported pattern matches of $GROQ_API_KEY or $HMAC_SECRET or $SLACK_WEBHOOK_URL
+[Pipeline] {
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 15 min
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (HMAC verification)
+[Pipeline] sh
++ set -eu
++ '[' -n **** ']'
++ echo '[hmac] secret loaded from Jenkins Credentials (github-webhook-secret)'
+[hmac] secret loaded from Jenkins Credentials (github-webhook-secret)
++ echo '[hmac] secret length: 64 bytes'
+[hmac] secret length: 64 bytes
++ echo '[hmac] HMAC verification: delegated to Jenkins GitHub plugin (X-Hub-Signature-256)'
+[hmac] HMAC verification: delegated to Jenkins GitHub plugin (X-Hub-Signature-256)
++ PAYLOAD='{"zen":"test"}'
+++ echo -n '{"zen":"test"}'
+++ openssl dgst -sha256 -hmac ****
+++ awk '{print $2}'
++ SIG=sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34
++ echo '[hmac] proof: HMAC-SHA256 of test payload = sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34'
+[hmac] proof: HMAC-SHA256 of test payload = sha256=fe657c387bb61ab1e63723c26a2045eac06bf55f348db1785bfbf46051375c34
++ echo '[hmac] limitation: smee relay strips X-Hub-Signature-256; direct trigger path verified'
+[hmac] limitation: smee relay strips X-Hub-Signature-256; direct trigger path verified
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Provision outils)
+[Pipeline] sh
++ set -eu
++ mkdir -p /home/carbon14/devsecops-tools
++ '[' '!' -x /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep ']'
++ /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep --version
+
+A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+1.172.0
++ '[' '!' -x /home/carbon14/devsecops-tools/gitleaks ']'
++ /home/carbon14/devsecops-tools/gitleaks version
+8.30.1
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Scans parallèles)
+[Pipeline] parallel
+[Pipeline] { (Branch: 1. Scan SAST (SemGrep))
+[Pipeline] { (Branch: 2. Scan SCA (Trivy))
+[Pipeline] { (Branch: 3. Scan Secrets (Gitleaks))
+[Pipeline] stage
+[Pipeline] { (1. Scan SAST (SemGrep))
+[Pipeline] stage
+[Pipeline] { (2. Scan SCA (Trivy))
+[Pipeline] stage
+[Pipeline] { (3. Scan Secrets (Gitleaks))
+[Pipeline] sh
+[Pipeline] sh
+[Pipeline] sh
++ set +e
++ SEMGREP=/home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ /home/carbon14/devsecops-tools/semgrep-venv/bin/semgrep scan --config pipeline/rules/semgrep.yml --sarif -o pipeline/out/semgrep.sarif app
++ set +e
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ trivy fs --skip-db-update --format json --severity HIGH,CRITICAL app
++ break
++ '[' '!' -f pipeline/out/trivy.json ']'
++ '[' '!' -s pipeline/out/trivy.json ']'
+++ '[' -s pipeline/out/trivy.json ']'
+++ echo ok
++ echo '[scanner] trivy: ok'
+[scanner] trivy: ok
+[Pipeline] }
++ set +e
++ mkdir -p pipeline/out
++ for ATTEMPT in 1 2 3
++ /home/carbon14/devsecops-tools/gitleaks detect --config .gitleaks.toml --no-git -s app --report-format json --report-path pipeline/out/gitleaks.json -v
+[Pipeline] // stage
+[Pipeline] }
++ EXIT=1
++ '[' 1 -eq 1 ']'
++ echo '[resilience] gitleaks found secrets (exit 1), this is expected'
+[resilience] gitleaks found secrets (exit 1), this is expected
++ break
++ '[' '!' -f pipeline/out/gitleaks.json ']'
++ '[' '!' -s pipeline/out/gitleaks.json ']'
+++ '[' -s pipeline/out/gitleaks.json ']'
+++ echo ok
++ echo '[scanner] gitleaks: ok'
+[scanner] gitleaks: ok
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
++ break
++ '[' '!' -f pipeline/out/semgrep.sarif ']'
++ '[' '!' -s pipeline/out/semgrep.sarif ']'
+++ '[' -s pipeline/out/semgrep.sarif ']'
+++ echo ok
++ echo '[scanner] semgrep: ok'
+[scanner] semgrep: ok
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // parallel
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (4. Normalisation + Merge)
+[Pipeline] sh
++ set +e
++ node pipeline/normalize/src/index.js --sarif pipeline/out/semgrep.sarif --tool semgrep --out pipeline/out/pivot-semgrep.json
+[normalize] 3 finding(s) → pivot (semgrep)
+[normalize] écrit dans pipeline/out/pivot-semgrep.json
++ node pipeline/normalize/src/index.js --json pipeline/out/trivy.json --tool trivy --out pipeline/out/pivot-trivy.json
+[normalize] 4 finding(s) → pivot (trivy)
+[normalize] écrit dans pipeline/out/pivot-trivy.json
++ node pipeline/normalize/src/index.js --json pipeline/out/gitleaks.json --tool gitleaks --out pipeline/out/pivot-gitleaks.json
+[normalize] 2 finding(s) → pivot (gitleaks)
+[normalize] écrit dans pipeline/out/pivot-gitleaks.json
++ node pipeline/normalize/src/index.js --merge pipeline/out/pivot-semgrep.json pipeline/out/pivot-trivy.json pipeline/out/pivot-gitleaks.json --out pipeline/out/pivot-phase1.json
+[normalize] 9 finding(s) mergés → pipeline/out/pivot-phase1.json
+++ node -e 'const p=JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/pivot-phase1.json'\'','\''utf8'\'')); console.log(p.findings.length)'
++ echo '[phase1] 9 finding(s) → Phase 1 pivot'
+[phase1] 9 finding(s) → Phase 1 pivot
++ '[' app = app ']'
++ node pipeline/ai/composition.js app pipeline/out/pivot-composition.json
+[composition] 6 findings → pipeline/out/pivot-composition.json
++ KUBE_SCORE=/home/carbon14/devsecops-tools/kube-score
++ '[' -x /home/carbon14/devsecops-tools/kube-score ']'
++ /home/carbon14/devsecops-tools/kube-score score k8s/base/app-deployment.yaml k8s/base/app-service.yaml k8s/base/kustomization.yaml k8s/base/mongodb-deployment.yaml k8s/base/mongodb-service.yaml k8s/base/namespace.yaml
++ true
++ node pipeline/normalize/src/index.js --text pipeline/out/kube-score.txt --tool kube-score --out pipeline/out/pivot-kube-score.json
+[normalize] 15 finding(s) → pivot (kube-score)
+[normalize] écrit dans pipeline/out/pivot-kube-score.json
++ node pipeline/normalize/src/index.js --merge pipeline/out/pivot-semgrep.json pipeline/out/pivot-trivy.json pipeline/out/pivot-gitleaks.json pipeline/out/pivot-kube-score.json pipeline/out/pivot-composition.json --out pipeline/out/pivot.json
+[normalize] 30 finding(s) mergés → pipeline/out/pivot.json
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (5. Scoring + porte de décision)
+[Pipeline] sh
++ set -eu
++ node pipeline/score/src/index.js pipeline/out/pivot-phase1.json --out pipeline/out/decision-phase1.json
+================================================================
+  DÉCISION : BLOCK  (score cumulé non plafonné 74 / seuil 10)
+================================================================
+
+Findings bruts : 9  →  après filtrage bruit/dédup : 9
+
+Top findings pondérés (sévérité × catégorie) :
+
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:9
+      aws-access-key — Secret detected: AKIAIOSFODNN7EXAMPLE at line 9
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:15
+      generic-secret — Secret detected: Password: 'admin123' at line 15
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/config.js:9
+      pipeline.rules.hardcoded-aws-credential — Hardcoded credential (VULN-002): AWS access key in source code. Move to environment variable / secret manager.
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/routes/search.js:17
+      pipeline.rules.nosql-injection-where — NoSQL injection (VULN-001): user input interpolated into a `$where` operator. Use an escaped regex or text search, never $where.
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2020-8203 — lodash@4.17.15 is vulnerable: CVE-2020-8203 (fix: 4.17.19)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2021-23337 — lodash@4.17.15 is vulnerable: CVE-2021-23337 (fix: 4.17.21)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2026-4800 — lodash@4.17.15 is vulnerable: CVE-2026-4800 (fix: 4.18.0)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      NSWG-ECO-516 — lodash@4.17.15 is vulnerable: NSWG-ECO-516 (fix: >=4.17.19)
+  [4.0 pts] MEDIUM   sast     semgrep  app/server/src/routes/auth.js:19
+      pipeline.rules.nosql-injection-query-filter — NoSQL injection (VULN-001): findOne() filter built from an object literal - risk of operator injection ({ $ne: ... }). Validate inputs as strings first.
+
+Pourquoi BLOCK : le score cumulé dépasse le seuil de blocage.
+→ Corriger les findings listés, ou recalibrer le seuil/les poids (pipeline/score/config/).
+
+Poids appliqués — sévérité : {"critical":10,"high":7,"medium":4,"low":1,"info":0.5}
+Poids appliqués — catégorie : {"sast":1,"sca":1,"secrets":2,"container":1.2,"k8s":1,"dast":1.5}
+[score] décision structurée → pipeline/out/decision-phase1.json
+[score] log explicatif      → pipeline/out/decision-phase1.log
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision-phase1.json'\'','\''utf8'\'')).totalScore)'
++ P1_SCORE=74
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision-phase1.json'\'','\''utf8'\'')).filteredFindings)'
++ P1_FINDINGS=9
++ echo 'Phase 1 (V0-V2): score=74 findings=9'
+Phase 1 (V0-V2): score=74 findings=9
++ node pipeline/score/src/index.js pipeline/out/pivot.json --out pipeline/out/decision.json
+================================================================
+  DÉCISION : BLOCK  (score cumulé non plafonné 217 / seuil 10)
+================================================================
+
+Findings bruts : 30  →  après filtrage bruit/dédup : 30
+
+Top findings pondérés (sévérité × catégorie) :
+
+  [20.0 pts] CRITICAL secrets  composition app/server/src/config.js:0
+      hardcoded-secrets-in-config — Configuration file contains hardcoded secrets
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:9
+      aws-access-key — Secret detected: AKIAIOSFODNN7EXAMPLE at line 9
+  [14.0 pts] HIGH     secrets  gitleaks app/server/src/config.js:15
+      generic-secret — Secret detected: Password: 'admin123' at line 15
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/config.js:9
+      pipeline.rules.hardcoded-aws-credential — Hardcoded credential (VULN-002): AWS access key in source code. Move to environment variable / secret manager.
+  [7.0 pts] HIGH     sast     semgrep  app/server/src/routes/search.js:17
+      pipeline.rules.nosql-injection-where — NoSQL injection (VULN-001): user input interpolated into a `$where` operator. Use an escaped regex or text search, never $where.
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2020-8203 — lodash@4.17.15 is vulnerable: CVE-2020-8203 (fix: 4.17.19)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2021-23337 — lodash@4.17.15 is vulnerable: CVE-2021-23337 (fix: 4.17.21)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      CVE-2026-4800 — lodash@4.17.15 is vulnerable: CVE-2026-4800 (fix: 4.18.0)
+  [7.0 pts] HIGH     sca      trivy    server/package-lock.json:0
+      NSWG-ECO-516 — lodash@4.17.15 is vulnerable: NSWG-ECO-516 (fix: >=4.17.19)
+  [7.0 pts] HIGH     k8s      kube-score devsecops-app/devsecops:0
+      container-security-context-user-group-id — Container Security Context User Group ID
+
+Pourquoi BLOCK : le score cumulé dépasse le seuil de blocage.
+→ Corriger les findings listés, ou recalibrer le seuil/les poids (pipeline/score/config/).
+
+Poids appliqués — sévérité : {"critical":10,"high":7,"medium":4,"low":1,"info":0.5}
+Poids appliqués — catégorie : {"sast":1,"sca":1,"secrets":2,"container":1.2,"k8s":1,"dast":1.5}
+[score] décision structurée → pipeline/out/decision.json
+[score] log explicatif      → pipeline/out/decision.log
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).totalScore)'
++ TOTAL_SCORE=217
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).filteredFindings)'
++ TOTAL_FINDINGS=30
+++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).decision)'
++ DECISION=BLOCK
++ node -e $'\n            const fs=require(\'fs\');\n            const d=JSON.parse(fs.readFileSync(\'pipeline/out/decision.json\',\'utf8\'));\n            const p1=JSON.parse(fs.readFileSync(\'pipeline/out/decision-phase1.json\',\'utf8\'));\n            d.phase1={score:p1.totalScore,findings:p1.filteredFindings,rawFindings:p1.rawFindings};\n            d.phase2Contribution=d.totalScore-p1.totalScore;\n            fs.writeFileSync(\'pipeline/out/decision.json\',JSON.stringify(d,null,2));\n          '
++ echo 'Total (Phase 1+2): score=217 findings=30 decision=BLOCK'
+Total (Phase 1+2): score=217 findings=30 decision=BLOCK
++ echo 'Phase 2 contribution: +143 pts'
+Phase 2 contribution: +143 pts
++ '[' BLOCK = BLOCK ']'
++ echo 'BLOCK: score depasse le seuil'
+BLOCK: score depasse le seuil
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (6. Rapport exécutif)
+[Pipeline] sh
++ set +e
++ node pipeline/ai/report.js pipeline/out/pivot.json pipeline/out/decision.json pipeline/out/report.txt
+[report] deterministic report built
+[report] calling LLM (Groq)...
+[report] LLM summary appended
+[report] written to pipeline/out/report.txt
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions)
+[Pipeline] echo
+=== ARCHIVES DU RUN (pivots, décision, log) ===
+[Pipeline] archiveArtifacts
+Archiving artifacts
+[Pipeline] sh
++ set +e
++ bash pipeline/scripts/save-run.sh pipeline/out
+[run-saved] /home/carbon14/devsecops-runs/20260901-165026
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).decision)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).totalScore)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).blockThreshold)'
+[Pipeline] sh
++ node -e 'console.log(JSON.parse(require('\''fs'\'').readFileSync('\''pipeline/out/decision.json'\'','\''utf8'\'')).filteredFindings)'
+[Pipeline] echo
+Decision: BLOCK | Score: 217 | Findings: 30
+[Pipeline] sh
+Warning: A secret was passed to "sh" using Groovy String interpolation, which is insecure.
+		 Affected argument(s) used the following variable(s): [SLACK_WEBHOOK_URL]
+		 See https://jenkins.io/redirect/groovy-string-interpolation for details.
++ SLACK_WEBHOOK_URL=****
++ bash pipeline/scripts/notify.sh BLOCK 217 10 30 pipeline/out/report.txt
+=== NOTIFICATION ===
+  Decision: BLOCK
+  Score: 217 / 10
+  Findings: 30
+
+[notify] Slack: sent (BLOCK)
+[notify] NOTIFY_EMAIL not set, skipping email
+[notify] logged to /home/carbon14/devsecops-runs/notifications.log
+=== END NOTIFICATION ===
+[Pipeline] sh
++ bash pipeline/scripts/rollback.sh pipeline/out/decision.json devsecops devsecops-app
+[rollback] kubectl not found, skipping rollback check
+[Pipeline] error
+[Pipeline] }
+[Pipeline] // script
+Error when executing always post condition:
+Also:   org.jenkinsci.plugins.workflow.actions.ErrorAction$ErrorId: 24b15e30-aa37-426b-af97-5df05391dc6a
+hudson.AbortException: BLOCK: score depasse le seuil
+	at PluginClassLoader for workflow-basic-steps//org.jenkinsci.plugins.workflow.steps.ErrorStep$Execution.run(ErrorStep.java:64)
+	at PluginClassLoader for workflow-basic-steps//org.jenkinsci.plugins.workflow.steps.ErrorStep$Execution.run(ErrorStep.java:51)
+	at PluginClassLoader for workflow-step-api//org.jenkinsci.plugins.workflow.steps.SynchronousStepExecution.start(SynchronousStepExecution.java:38)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.DSL.invokeStep(DSL.java:339)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.DSL.invokeMethod(DSL.java:199)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsScript.invokeMethod(CpsScript.java:124)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.codehaus.groovy.reflection.CachedMethod.invoke(CachedMethod.java:98)
+	at groovy.lang.MetaMethod.doMethodInvoke(MetaMethod.java:325)
+	at groovy.lang.MetaClassImpl.invokeMethod(MetaClassImpl.java:1225)
+	at groovy.lang.MetaClassImpl.invokeMethod(MetaClassImpl.java:1034)
+	at org.codehaus.groovy.runtime.callsite.PogoMetaClassSite.call(PogoMetaClassSite.java:41)
+	at org.codehaus.groovy.runtime.callsite.CallSiteArray.defaultCall(CallSiteArray.java:47)
+	at org.codehaus.groovy.runtime.callsite.AbstractCallSite.call(AbstractCallSite.java:116)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.impl.Checker$1.call(Checker.java:180)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.GroovyInterceptor.onMethodCall(GroovyInterceptor.java:23)
+	at PluginClassLoader for script-security//org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.SandboxInterceptor.onMethodCall(SandboxInterceptor.java:163)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.impl.Checker$1.call(Checker.java:178)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.impl.Checker.checkedCall(Checker.java:182)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.impl.Checker.checkedCall(Checker.java:152)
+	at PluginClassLoader for script-security//org.kohsuke.groovy.sandbox.impl.Checker.checkedCall(Checker.java:152)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.sandbox.SandboxInvoker.methodCall(SandboxInvoker.java:17)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.LoggingInvoker.methodCall(LoggingInvoker.java:124)
+	at WorkflowScript.run(WorkflowScript:231)
+	at ___cps.transform___(Native Method)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.impl.ContinuationGroup.methodCall(ContinuationGroup.java:107)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.impl.FunctionCallBlock$ContinuationImpl.dispatchOrArg(FunctionCallBlock.java:118)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.impl.FunctionCallBlock$ContinuationImpl.fixArg(FunctionCallBlock.java:87)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.impl.ContinuationPtr$ContinuationImpl.receive(ContinuationPtr.java:71)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.impl.ConstantBlock.eval(ConstantBlock.java:21)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.Next.step(Next.java:84)
+	at PluginClassLoader for workflow-cps//com.cloudbees.groovy.cps.Continuable.run0(Continuable.java:142)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.SandboxContinuable.access$001(SandboxContinuable.java:17)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.SandboxContinuable.run0(SandboxContinuable.java:48)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsThread.runNextChunk(CpsThread.java:188)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsThreadGroup.run(CpsThreadGroup.java:464)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsThreadGroup$2.call(CpsThreadGroup.java:372)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsThreadGroup$2.call(CpsThreadGroup.java:302)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsVmExecutorService.lambda$wrap$4(CpsVmExecutorService.java:143)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at hudson.remoting.SingleLaneExecutorService$1.run(SingleLaneExecutorService.java:139)
+	at jenkins.util.ContextResettingExecutorService.lambda$wrap$0(ContextResettingExecutorService.java:26)
+	at jenkins.security.ImpersonatingExecutorService.lambda$wrap$0(ImpersonatingExecutorService.java:66)
+	at jenkins.util.ErrorLoggingExecutorService.lambda$wrap$0(ErrorLoggingExecutorService.java:51)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsVmExecutorService$1.call(CpsVmExecutorService.java:53)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsVmExecutorService$1.call(CpsVmExecutorService.java:50)
+	at org.codehaus.groovy.runtime.GroovyCategorySupport$ThreadCategoryInfo.use(GroovyCategorySupport.java:136)
+	at org.codehaus.groovy.runtime.GroovyCategorySupport.use(GroovyCategorySupport.java:275)
+	at PluginClassLoader for workflow-cps//org.jenkinsci.plugins.workflow.cps.CpsVmExecutorService.lambda$categoryThreadFactory$0(CpsVmExecutorService.java:50)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+[Pipeline] echo
+=== PORTE DE DÉCISION : BLOCK — build rouge ===
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // withCredentials
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+ERROR: BLOCK: score depasse le seuil
+Finished: FAILURE

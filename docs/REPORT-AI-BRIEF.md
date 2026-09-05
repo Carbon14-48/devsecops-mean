@@ -53,8 +53,10 @@
 | kube-score (K8s) | 15 | 99 pts |
 | Composition | 6 | 44 pts |
 
-**Total : 30 findings → 217 pts ≥ seuil 10 → BLOCK.**
+**Total : 30 findings → `totalScore: 217` ≥ `blockThreshold: 10` → `decision: BLOCK`.**
 
+> **Vérification contre le JSON réel** (`~/devsecops-runs/20260901-165026/decision.json`) : les clés sont `decision`, `totalScore`, `blockThreshold`, `phase1` (objet : `score: 74`, `findings: 9`), `phase2Contribution: 143`, `top` (classement), `filteredFindings`, `rawFindings`, `weights`. Le champ `score` est `null` — ne pas le confondre avec `totalScore`.
+>
 > Point bonus défendable : c'est **kube-score** (15 findings, 99 pts) qui pèse le plus en Phase 2, pas la composition (6 findings, 44 pts). Chaque finding = sévérité × catégorie (ex. composition top item = CRITICAL × secrets 2.0 = 20 pts). La séparation Phase 1/Phase 2 répond à la question du tutor : *« Comment la Phase 2 s'agrège à la Phase 1 ? »* (ADR-0002).
 
 ## 4. Vulnérabilités injectées / détectées
@@ -186,7 +188,7 @@ Le doublon est supprimé, le score original 217 est préservé. Artefacts : `~/d
 
 ## 9. Les 5 points du tuteur — réponses argumentées (gaps corrigés)
 
-1. **Séparation des scores** → Phase 1/Phase 2 (ADR-0002) : `decision-phase1.json` vs `decision.json` avec `phase1.score` + `phase2Contribution`. V2 = 74 (cœur), V3 = 217 (dont +143).
+1. **Séparation des scores** → Phase 1/Phase 2 (ADR-0002) : `decision-phase1.json` vs `decision.json` avec `phase1.score` + `phase2Contribution`. V2 = 74 (`phase1.score`), V3 = `totalScore` 217 (dont +143 `phase2Contribution`). Clés JSON vérifiées : `totalScore`, `blockThreshold`, `decision`.
 2. **HMAC webhook** → `HMAC_SECRET` chargé depuis Credentials, preuve calculée dans le Stage 1, limitation smee documentée.
 3. **Credentials Jenkins** → 3 secrets en Credentials Binding (`groq-api-key`, `slack-webhook-url`, `github-webhook-secret`), vérifiés via API (plus aucun secret en dur dans le code).
 4. **Bruit / stabilité du score** → `.gitleaks.toml` allowlist (`pipeline/out/`, `pipeline/runs/`, `docs/`, `app/inject/`, `node_modules/`) → score **217 stable** sur builds consécutifs ; tests noise-filter (12 tests passants, tournent à chaque build Jenkins Stage 2) ; preuve E2E 31→30 (doublon injecté dans pivot réel, score inchangé).
@@ -199,19 +201,24 @@ Le doublon est supprimé, le score original 217 est préservé. Artefacts : `~/d
 - Rapport IA : `pipeline/ai/report.js` + `llm.js` (**Groq**, `fetch` natif, fallback déterministe) ; `pipeline/ai/composition.js` = analyse d'architecture/surface d'attaque.
 - Archivage : `pipeline/scripts/save-run.sh` → `~/devsecops-runs/<timestamp>/` (ex. `20260901-165026/` = le run BLOCK 217 de l'E2E).
 - Dashboard V2 : Express API port 3200, SPA vanilla dark, cards par catégorie, lit `~/devsecops-runs/`.
+- **Bug corrigé — SCAN_ROOT-override → score 340 fictif** : au début du développement E2E, on pouvait injecter `SCAN_ROOT=test/fixtures/fake-app` en override Jenkins, ce qui produisait un score artificiel de 340 (faux positifs sur données de test). Fix : `SCAN_ROOT` par défaut dans la définition de job (`app` pour v0, `test/fixtures/clean-app` pour v0-pass), pas d'override manuel. Le pipeline actuel est **100% déterministe** : les 217 points du BLOCK proviennent exclusivement de l'application réelle `app/` et de la configuration K8s, pas de données de test.
 - Docs de référence : `README.md`, `docs/ROADMAP.md`, `docs/DEMO-V0.md`, `docs/SETUP-JENKINS.md`, `docs/V2-HMAC-SETUP.md`, `docs/ADR/ADR-0001` (seuil + limite Gitleaks --no-git), `docs/ADR/ADR-0002` (séparation Phase 1/2).
 
 ## 11. Captures d'écran à insérer (9, ordre de démo)
 
-1. `kubectl get pods -A` (kube-system + devsecops + argocd toutes Running).
-2. `curl -H "Host: devsecops.local" http://localhost/health` → `{"status":"ok"}`.
-3. Argo CD — page Applications (`devsecops-mean` Healthy) + login.
-4. Jenkins console `devsecops-v0` #36 — `PORTE DE DÉCISION : BLOCK` + `Score: 217 | Findings: 30`.
-5. Jenkins console `devsecops-v0-pass` #27 — `PORTE DE DÉCISION : PASS` + `Score: 0 | Findings: 0` + `Noise filter tests → Results: 12 passed, 0 failed`.
-6. Dashboard (cards SAST/SCA/Secrets/K8s/DAST + score + décision).
-7. Rapport exécutif `report.txt` (section IA Groq visible).
-8. ZAP `pipeline/out/zap-report.html` (0 FAIL / 58 PASS / 3 WARN).
-9. Dedup proof `~/devsecops-runs/dedup-proof-20260902-120826/decision.log` (bruts: 31 → filtrés: 30, score 217).
+> **Chaque capture est un fichier concret sur disque.** Pour le rapport, screenshot/image les fichiers listés ci-dessous. Le répertoire `docs/screenshots/` contient les preuves prêtes à capturer.
+
+| # | Sujet | Commande / Fichier | Preuve sur disque |
+|---|-------|-------------------|-------------------|
+| 1 | K8s pods (tous Running) | `kubectl get pods -A` | `docs/screenshots/01-k8s-pods.txt` |
+| 2 | App health | `curl -H "Host: devsecops.local" http://localhost/health` | `docs/screenshots/02-health.txt` |
+| 3 | Argo CD UI (apps Healthy) | `https://localhost:9090` → login `admin` / `4OKpXWRDqaW2oyH8` | `docs/screenshots/03-argocd.txt` (capture texte) |
+| 4 | Jenkins v0 (BLOCK 217) | Console `devsecops-v0` #36 | `docs/screenshots/04-jenkins-v0-BLOCK.txt` |
+| 5 | Jenkins v0-pass (PASS 0) + noise tests | Console `devsecops-v0-pass` #27/#28 | `docs/screenshots/05-jenkins-v0pass-PASS.txt` |
+| 6 | Dashboard (cards) | `http://localhost:3200` | `docs/screenshots/06-dashboard.txt` (ou screenshot image) |
+| 7 | Rapport exécutif **IA Groq** | `~/devsecops-runs/20260901-165026/report.txt` | `docs/screenshots/07-report-IA.txt` (section `RÉSUMÉ EXÉCUTIF (généré par IA — Groq Llama)`) |
+| 8 | ZAP report (0 FAIL / 58 PASS / 3 WARN) | `pipeline/out/zap-report.html` | `docs/screenshots/08-zap-report.html` (ouvrable dans navigateur) |
+| 9 | Dedup proof (31→30, score 217) | `~/devsecops-runs/dedup-proof-20260902-120826/decision.log` | `docs/screenshots/09-dedup-decision.log` |
 
 ---
 

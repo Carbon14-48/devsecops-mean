@@ -1,0 +1,16 @@
+NAMESPACE     NAME                                                READY   STATUS      RESTARTS       AGE
+argocd        argocd-application-controller-0                     1/1     Running     0              4d3h
+argocd        argocd-applicationset-controller-6cc6ff65b6-hj5zh   1/1     Running     0              4d3h
+argocd        argocd-dex-server-569cc67f5f-xwrqq                  1/1     Running     0              4d3h
+argocd        argocd-notifications-controller-7d9478f86-zmb5h     1/1     Running     0              4d3h
+argocd        argocd-redis-54bd4f8bd6-g8njb                       1/1     Running     0              4d3h
+argocd        argocd-repo-server-57667bbc7f-mj7bb                 1/1     Running     2 (4d3h ago)   4d3h
+argocd        argocd-server-9d48fdd75-9m7wb                       1/1     Running     0              4d3h
+devsecops     devsecops-app-86577d5685-xjdn2                      1/1     Running     0              4d3h
+devsecops     mongodb-6dbdb84f94-vp9c5                            1/1     Running     0              4d3h
+kube-system   coredns-85548b6544-nmhxm                            1/1     Running     0              4d3h
+kube-system   helm-install-traefik-5rl9r                          0/1     Completed   0              4d3h
+kube-system   local-path-provisioner-595dcfc56f-5bx67             1/1     Running     0              4d3h
+kube-system   metrics-server-cdcc87586-x4mpn                      1/1     Running     0              4d3h
+kube-system   svclb-traefik-d5754187-nwdfn                        2/2     Running     0              4d3h
+kube-system   traefik-d7c9c5778-5htrv                             1/1     Running     0              4d3h
