@@ -2,7 +2,7 @@
 
 > **Usage** : donne ce fichier en entier à un assistant IA (avec, si possible, `README.md`, `docs/ROADMAP.md`, `docs/ADR/*.md`, `docs/SETUP-JENKINS.md`) et demande : *« Rédige un rapport de soutenance de stage complet, structuré selon le plan de la section "Plan demandé", en français, avec toutes les preuves fournies. »*
 >
-> Tous les faits, nombres et preuves ci-dessous ont été **vérifiés sur l'état réel du projet** (commit `7c2042f`).
+> Tous les faits, nombres et preuves ci-dessous ont été **vérifiés sur l'état réel du projet** (commit `7c34595`).
 
 ---
 
@@ -98,7 +98,7 @@ environment {
 
 **7 stages** :
 1. **HMAC verification** — signature HMAC-SHA256, preuve calculée sur payload test ; limitation smee documentée (le relay strip la signature).
-2. **Provision outils** — SemGrep (venv pip), Gitleaks (curl+tar) si absents.
+2. **Provision outils** — SemGrep (venv pip), Gitleaks (curl+tar) si absents, **noise-filter tests** (`pipeline/score/test/run.sh` → 12 assertions dedup/confidence/ignoredRules).
 3. **Scans parallèles** (retry 3×, fallback vide) :
    - SAST : `semgrep --config auto --sarif`
    - SCA : `trivy fs --skip-db-update --format json --severity HIGH,CRITICAL` *(ajouté pour éviter le pendu sur téléchargement de DB — avant ce fix, Trivy échouait silencieusement et la note "PASS 0/0" était FAUSSE)*
@@ -114,9 +114,38 @@ environment {
 
 **E2E final (preuves) :**
 - `devsecops-v0` **#36** → `FAILURE` — `Decision: BLOCK | Score: 217 | Findings: 30`, ligne console `PORTE DE DÉCISION : BLOCK — build rouge`, Slack notifié.
-- `devsecops-v0-pass` **#26** → `SUCCESS` — `Decision: PASS | Score: 0 | Findings: 0`, ligne `PORTE DE DÉCISION : PASS — build vert`.
+- `devsecops-v0-pass` **#27/#28** → `SUCCESS` — `Decision: PASS | Score: 0 | Findings: 0`, ligne `PORTE DE DÉCISION : PASS — build vert`, noise-filter tests `Results: 12 passed, 0 failed`.
 
 **Credentials Jenkins (vérifiés via API, store système, "Secret text")** : `groq-api-key`, `github-webhook-secret`, `slack-webhook-url`. (Groq : la console montre `[report] calling LLM (Groq)… [report] LLM summary appended`.)
+
+## 6bis. Filtrage du bruit / déduplication
+
+Le scoring inclut un filtre de bruit (`pipeline/score/src/engine.js` → `filterNoise()`) qui supprime les **doublons** (même `id`), les findings à **confiance faible** (< 0.5) et les **règles ignorées** (`ignoredRules`).
+
+**Contrat d'id** : `hashId([tool, ruleId, file, line])`. Deux findings d'outils différents sur la même ligne ont des ids distincts (chaque occurrence est scored séparément, c'est un choix de conception). Un doublon *vrai* partage exactement le même id.
+
+### Tests unitaires (12/12 passants, tournent à chaque build Jenkins)
+
+`pipeline/score/test/run.sh` → prouve la dédup, la confiance, les règles ignorées :
+
+```
+Test 1: Dedup by id         → bruts: 3 → filtrés: 2  (même id, gardé le plus sévère)
+Test 2: Confidence          → bruts: 3 → filtrés: 1  (confidence < 0.5 supprimé)
+Test 3: ignoredRules        → bruts: 3 → filtrés: 1  (règle ignorée supprimée)
+Test 4: Combined scenario   → bruts: 5 → filtrés: 2  (déduction + confiance + ignoredRules)
+Test 5: decide() full run   → raw: 3 → filtered: 1   (bruit complet)
+```
+
+### Preuve E2E — pivot réel + doublon injecté
+
+On prend le pivot du run de référence (30 findings, 217 pts), injecte un doublon (même id, sévérité inférieure), et relance le scoring :
+
+```
+Findings bruts : 31  →  après filtrage bruit/dédup : 30
+DÉCISION : BLOCK (score inchangé = 217 / seuil 10)
+```
+
+Le doublon est supprimé, le score original 217 est préservé. Artefacts : `~/devsecops-runs/dedup-proof-20260902-120826/`.
 
 ## 7. Infrastructure V3 — K8s / Argo CD / ZAP
 
@@ -160,7 +189,7 @@ environment {
 1. **Séparation des scores** → Phase 1/Phase 2 (ADR-0002) : `decision-phase1.json` vs `decision.json` avec `phase1.score` + `phase2Contribution`. V2 = 74 (cœur), V3 = 217 (dont +143).
 2. **HMAC webhook** → `HMAC_SECRET` chargé depuis Credentials, preuve calculée dans le Stage 1, limitation smee documentée.
 3. **Credentials Jenkins** → 3 secrets en Credentials Binding (`groq-api-key`, `slack-webhook-url`, `github-webhook-secret`), vérifiés via API (plus aucun secret en dur dans le code).
-4. **Bruit / stabilité du score** → `.gitleaks.toml` allowlist (`pipeline/out/`, `pipeline/runs/`, `docs/`, `app/inject/`, `node_modules/`) → score **217 stable** sur builds consécutifs ; tests noise-filter (12 tests passants).
+4. **Bruit / stabilité du score** → `.gitleaks.toml` allowlist (`pipeline/out/`, `pipeline/runs/`, `docs/`, `app/inject/`, `node_modules/`) → score **217 stable** sur builds consécutifs ; tests noise-filter (12 tests passants, tournent à chaque build Jenkins Stage 2) ; preuve E2E 31→30 (doublon injecté dans pivot réel, score inchangé).
 5. **Notifications Slack** → `notify.sh` appelé au Stage 7 (ex. « [notify] Slack: sent (BLOCK) »).
 
 ## 10. Faits techniques utiles (piqures de rappel pour l'écriture)
@@ -178,11 +207,11 @@ environment {
 2. `curl -H "Host: devsecops.local" http://localhost/health` → `{"status":"ok"}`.
 3. Argo CD — page Applications (`devsecops-mean` Healthy) + login.
 4. Jenkins console `devsecops-v0` #36 — `PORTE DE DÉCISION : BLOCK` + `Score: 217 | Findings: 30`.
-5. Jenkins console `devsecops-v0-pass` #26 — `PORTE DE DÉCISION : PASS` + `Score: 0 | Findings: 0`.
+5. Jenkins console `devsecops-v0-pass` #27 — `PORTE DE DÉCISION : PASS` + `Score: 0 | Findings: 0` + `Noise filter tests → Results: 12 passed, 0 failed`.
 6. Dashboard (cards SAST/SCA/Secrets/K8s/DAST + score + décision).
 7. Rapport exécutif `report.txt` (section IA Groq visible).
 8. ZAP `pipeline/out/zap-report.html` (0 FAIL / 58 PASS / 3 WARN).
-9. `git log --oneline` (progression V0→V3).
+9. Dedup proof `~/devsecops-runs/dedup-proof-20260902-120826/decision.log` (bruts: 31 → filtrés: 30, score 217).
 
 ---
 
